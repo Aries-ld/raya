@@ -1,7 +1,7 @@
-# data / artifacts (sync via download scripts, never git)
-data/
-checkpoints/
-logs/
+# data / artifacts (sync via download scripts, never git) — 仅仓库根，锚定防误伤 raya/data/ 包
+/data/
+/checkpoints/
+/logs/
 *.ckpt
 *.safetensors
 
