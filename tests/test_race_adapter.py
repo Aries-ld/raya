@@ -51,8 +51,9 @@ class TestRegistry:
 class TestLoadIntegration:
     """真实拉取（首次下载 ~100MB，走 HF cache）。手动跑：pytest -m integration"""
 
-    def test_load_small_slice(self, tmp_path):
-        adapter = RaceAdapter(cache_dir=str(tmp_path), config="middle")
+    def test_load_small_slice(self):
+        # 用默认 cache（data/hf_cache 已由目检导出预置）：同一源一天内重复拉会被镜像限流
+        adapter = RaceAdapter(config="middle")
         samples = list(adapter.load(split="train", limit=20))
         assert len(samples) == 20
         assert all(isinstance(s, DecisionSample) for s in samples)

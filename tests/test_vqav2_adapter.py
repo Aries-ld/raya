@@ -107,8 +107,9 @@ class TestRegistry:
 class TestLoadIntegration:
     """真实下载官方 validation 标注 JSON（~80MB，走 cache）。pytest -m integration（服务器上跑）"""
 
-    def test_load_small_slice(self, tmp_path):
-        adapter = VQAv2Adapter(cache_dir=str(tmp_path))
+    def test_load_small_slice(self):
+        # 用默认 cache（data/hf_cache）：S3 zip 由下载脚本/rsync 预置，不为测试重复拉外网
+        adapter = VQAv2Adapter()
         samples = list(adapter.load(split="validation", limit=10))
         assert len(samples) == 10
         assert all(s.modality == "image" and s.media_path for s in samples)
@@ -116,9 +117,9 @@ class TestLoadIntegration:
         # 软标签资产必须真实存在（VQA v2 的核心价值）
         assert all(s.answer_distribution is not None for s in samples)
 
-    def test_train_split_available(self, tmp_path):
+    def test_train_split_available(self):
         # lmms-lab 版无 train 的坑已踩过：官方源必须能出 train
-        adapter = VQAv2Adapter(cache_dir=str(tmp_path))
+        adapter = VQAv2Adapter()
         samples = list(adapter.load(split="train", limit=5))
         assert len(samples) == 5
         assert all(s.split == "train" for s in samples)
