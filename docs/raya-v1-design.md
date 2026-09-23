@@ -114,8 +114,8 @@ raya 的两个真护城河：**多模态原生输入**（三家都没有）+ **�
 | 图片 | **VQA v2 train**（10 人软标签 ⭐） | 45K | choice/noul |
 | 图片 | GQA train 子集 | 25K | choice/noul |
 | 图片 | KonIQ-10k / AVA 子集 | 10K | score |
-| 视频 | LLaVA-Video-178K MC（合成 ≤60%） | 35K | choice |
-| 视频 | NExT-QA / STAR / TGIF-QA train | 30K | choice |
+| 视频 | LLaVA-Video-178K（开放式 QA → **MC 构造移至 Step 0 教师管线**：M3 造干扰项+软分布，M1 不出 adapter） | 35K | choice |
+| 视频 | NExT-QA train（adapter 已就位）/ STAR / TGIF-QA | 30K | choice |
 
 ### 5.2 决策场景题（生产题型）
 内容审核 ToxicChat/Aegis 10K + Agent 动作选择 Mind2Web/AndroidWorld 10K。
@@ -170,7 +170,7 @@ SEED-Bench、Video-MME、MVP（防捷径，替代有捷径问题的 MVBench）�
 | MiniMax-M3 API（coding plan，并发 5） | Step 0 教师蒸馏，key 在服务器 `.env` |
 | `/autodl-pub` 14T 公共数据集盘 | 淘现成数据集，省下载 |
 
-注：QS H20 容器方案已废弃（共享授权不通）；系统盘仅 30G，一切落 autodl-tmp（租借机重建会丢系统盘）。
+注：QS H20 容器方案已废弃（共享授权不通）；系统盘仅 30G，一切落 autodl-tmp（租借机重建会丢系统盘）。⚠️ 服务器直连 HF Hub 不通（北京机房），**必须 `HF_ENDPOINT=https://hf-mirror.com`**（已写入服务器 .env）；本地 Mac 直连慢，集成测试统一在服务器跑。另外 datasets 5.x 已砍脚本式数据集（HuggingFaceM4/VQAv2 不可用），选型一律 parquet 原生仓（如 lmms-lab/*）。
 
 ### 6.2 时间预估（PRO 5000 单卡，2B 模型）
 SFT-LoRA ~半天/轮；全量 FT ~1 天/轮；RLCD ~1 天/轮；**一轮完整迭代 ~1.5-2 天**。教师蒸馏（数据生产）走 API 或独立环境，不抢训练卡。

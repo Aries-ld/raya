@@ -12,6 +12,9 @@ from pathlib import Path
 from loguru import logger
 
 import raya.data.adapters.race  # noqa: F401  # 触发注册；新增 adapter 在此追加 import
+import raya.data.adapters.vqav2  # noqa: F401
+import raya.data.adapters.koniq  # noqa: F401
+import raya.data.adapters.nextqa  # noqa: F401
 from raya.data.registry import get
 
 OUT_DIR = Path("data/eyeball")
