@@ -1,0 +1,20 @@
+# data / artifacts (sync via download scripts, never git)
+data/
+checkpoints/
+logs/
+*.ckpt
+*.safetensors
+
+# secrets — existence-check only, never commit
+.env
+.env.*
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# os / ide
+.DS_Store
+.idea/

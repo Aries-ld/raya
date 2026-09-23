@@ -1,0 +1,14 @@
+[project]
+name = "raya"
+version = "0.1.0"
+description = "Multimodal System-1 fast-decision model (Jev paradigm)"
+requires-python = ">=3.12"
+
+# flat layout：不 pip install -e .，统一 PYTHONPATH=. 运行（同 personos 约定）
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: hits network / downloads datasets (run manually with -m integration)",
+]
+addopts = "-m 'not integration'"
