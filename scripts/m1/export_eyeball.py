@@ -31,6 +31,9 @@ def main() -> None:
     adapter = get(args.adapter)
     if hasattr(adapter, "cache_dir"):
         adapter.cache_dir = args.cache_dir
+    # 目检只要 20 条：有 streaming 开关的 adapter 一律流式，不为抽检下载整集
+    if hasattr(adapter, "streaming"):
+        adapter.streaming = True
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUT_DIR / f"{args.adapter}_{args.split}_{args.limit}.jsonl"
