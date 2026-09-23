@@ -5,13 +5,15 @@
 - 其他 answer_type → choice 原语，选项 = 标注者答案去重集（≥2 才成题；
   全员一致的题选项空间为 1，不构成决策 → 跳过，留给后续难负例挖掘阶段补干扰项）
 - answer 一律取官方 multiple_choice_answer（10 人多数票）
-- 数据源 lmms-lab/VQAv2（parquet 原生；datasets 5.x 已砍脚本式数据集，HuggingFaceM4 版不可用）
+- 数据源：visualqa.org 官方 S3 标注 JSON（⚠️ lmms-lab/VQAv2 只有 validation/test，
+  无 train——M1 实测发现；官方 JSON 的字段与 lmms-lab 完全一致，train/val 同一条代码路径）
 
 adapter 不下载/不落图片：media_path 只给规范路径，物化由 scripts/m1/download.py 负责。
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Iterator, Optional
 
 from loguru import logger
@@ -21,7 +23,12 @@ from raya.data.schema import DecisionSample, Option
 
 _SOURCE = "vqav2"
 _LICENSE = "CC-BY-4.0 (annotations) / COCO image terms"
-_HF_NAME = "lmms-lab/VQAv2"
+# 官方 S3（questions + annotations 成对；test 无答案不支持）
+_S3 = "https://s3.amazonaws.com/cvmlp/vqa/mscoco/vqa"
+_ZIPS = {
+    "train": (f"{_S3}/v2_Questions_Train_mscoco.zip", f"{_S3}/v2_Annotations_Train_mscoco.zip"),
+    "validation": (f"{_S3}/v2_Questions_Val_mscoco.zip", f"{_S3}/v2_Annotations_Val_mscoco.zip"),
+}
 
 # HF split → COCO 目录名（VQA v2 train/val 基于 COCO 2014，test 基于 2015）
 _COCO_DIR = {"train": "train2014", "validation": "val2014", "test": "test2015"}
@@ -91,21 +98,39 @@ class VQAv2Adapter(BaseAdapter):
         description="VQA v2（COCO 2014 图 + 10 人标注软分布），S8 图像锚 + RLCD 校准燃料",
     )
 
-    def __init__(self, cache_dir: str = "data/hf_cache", streaming: bool = False):
-        self.cache_dir = cache_dir
-        self.streaming = streaming
+    def __init__(self, cache_dir: str = "data/hf_cache"):
+        self.cache_dir = Path(cache_dir)
+
+    def _load_records(self, split: str) -> list[dict]:
+        """下载并合并 questions/annotations（按 question_id join，保持问题顺序）。"""
+        import json
+        import zipfile
+        from urllib.request import urlretrieve
+
+        zip_dir = self.cache_dir / "vqav2"
+        zip_dir.mkdir(parents=True, exist_ok=True)
+        payloads: list[dict] = []
+        for url in _ZIPS[split]:
+            zip_path = zip_dir / url.rsplit("/", 1)[-1]
+            if not zip_path.exists():
+                logger.info("vqav2 adapter: downloading {}", url)
+                urlretrieve(url, zip_path)
+            with zipfile.ZipFile(zip_path) as zf:
+                payloads.append(json.loads(zf.read(zf.namelist()[0])))
+        questions, annotations = payloads[0]["questions"], payloads[1]["annotations"]
+        q_by_id = {q["question_id"]: q["question"] for q in questions}
+        return [
+            {**ann, "question": q_by_id[ann["question_id"]]}
+            for ann in annotations
+            if ann["question_id"] in q_by_id
+        ]
 
     def load(self, split: str = "train", limit: int | None = None) -> Iterator[DecisionSample]:
-        from datasets import load_dataset
-
-        ds = load_dataset(
-            _HF_NAME, split=split, cache_dir=self.cache_dir, streaming=self.streaming
-        )
-        # adapter 从不读像素（media_path 只是路径约定），剔除 image 列避免逐条解码/下载
-        if "image" in ds.column_names:
-            ds = ds.remove_columns(["image"])
+        if split not in _ZIPS:
+            raise ValueError(f"vqav2 split must be one of {sorted(_ZIPS)}, got '{split}'")
+        records = self._load_records(split)
         yielded = skipped = 0
-        for record in ds:
+        for record in records:
             if limit is not None and yielded >= limit:
                 break
             sample = _convert(record, split)

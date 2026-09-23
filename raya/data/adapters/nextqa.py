@@ -54,7 +54,8 @@ class NextQAAdapter(BaseAdapter):
         self.cache_dir = Path(cache_dir)
 
     def _csv_path(self, split: str) -> Path:
-        path = self.cache_dir / "nextqa" / f"{split}.csv"
+        # 调用方可能用 str 覆盖 cache_dir（如目检脚本），这里统一再包一层 Path
+        path = Path(self.cache_dir) / "nextqa" / f"{split}.csv"
         if not path.exists():
             path.parent.mkdir(parents=True, exist_ok=True)
             logger.info("nextqa adapter: downloading {} csv", split)

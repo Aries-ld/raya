@@ -105,13 +105,20 @@ class TestRegistry:
 
 @pytest.mark.integration
 class TestLoadIntegration:
-    """流式拉 30 条 validation 真实数据（不下载整集）。pytest -m integration"""
+    """真实下载官方 validation 标注 JSON（~80MB，走 cache）。pytest -m integration（服务器上跑）"""
 
-    def test_stream_small_slice(self):
-        adapter = VQAv2Adapter(streaming=True)
+    def test_load_small_slice(self, tmp_path):
+        adapter = VQAv2Adapter(cache_dir=str(tmp_path))
         samples = list(adapter.load(split="validation", limit=10))
         assert len(samples) == 10
         assert all(s.modality == "image" and s.media_path for s in samples)
         assert len({s.id for s in samples}) == 10
         # 软标签资产必须真实存在（VQA v2 的核心价值）
         assert all(s.answer_distribution is not None for s in samples)
+
+    def test_train_split_available(self, tmp_path):
+        # lmms-lab 版无 train 的坑已踩过：官方源必须能出 train
+        adapter = VQAv2Adapter(cache_dir=str(tmp_path))
+        samples = list(adapter.load(split="train", limit=5))
+        assert len(samples) == 5
+        assert all(s.split == "train" for s in samples)
