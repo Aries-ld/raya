@@ -1,0 +1,10 @@
+{
+  "dataset": "nextqa_val",
+  "model": "yuyu199741/raya-decision-v1",
+  "accuracy": 0.9,
+  "correct": 18,
+  "total": 20,
+  "ece": 0.14980468749999998,
+  "latency_p50_ms": 154.9,
+  "latency_p99_ms": 1403.1
+}

@@ -17,6 +17,28 @@
 
 A decision service built on a post-trained Qwen3.5-2B checkpoint. Ask **choice, score, and yes/no questions** over text, images, or short videos. Each question uses one forward pass and returns structured JSON, with no free-form text generation to parse.
 
+## Benchmarks
+
+All results are held-out (never seen during training). Every question is answered with a single forward pass and masked logit projection over candidate label tokens. See [eval/README.md](eval/README.md) for full methodology and per-benchmark details.
+
+| Benchmark | Modality | Task | Accuracy | ECE | p50 Latency |
+|---|---|---|---|---|---|
+| GQA val | Image | Visual QA | **100.0%** | 0.015 | 104ms |
+| KonIQ val | Image | Quality scoring (5-way) | **90.0%** | 0.194 | 59ms |
+| NExT-QA val | Video | Video content QA | **90.0%** | 0.150 | 155ms |
+| POPE | Image | Object existence (yes/no) | **88.5%** | 0.061 | 60ms |
+| AG News | Text | Topic classification (4-way) | **78.5%** | 0.082 | 45ms |
+| BoolQ | Text | Yes/no reading comprehension | **74.0%** | 0.169 | 86ms |
+| SST-5 | Text | Sentiment (5-way) | 39.5% | 0.210 | 45ms |
+| MMLU | Text | Graduate-level knowledge | 20.0% | 0.367 | 86ms |
+| SuperGPQA | Text | Graduate-level reasoning | 9.5% | 0.250 | 87ms |
+
+**Key takeaways:**
+- Strongest on image and video decision tasks (88–100%)
+- Confidence calibration is well-behaved on high-confidence predictions (ECE 0.015–0.061 on POPE/GQA)
+- Pure knowledge/reasoning benchmarks (MMLU, SuperGPQA) are not the target use case — Raya is a decision model, not a knowledge retrieval model
+- Text classification and reading comprehension tasks are solid (74–78%)
+
 ## Quick start
 
 Requires Python 3.12 or 3.13 and [uv](https://docs.astral.sh/uv/). The same codebase supports CUDA, Apple Silicon MPS, and CPU.

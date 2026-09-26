@@ -1,0 +1,10 @@
+{
+  "accuracy": 0.095,
+  "correct": 19,
+  "total": 200,
+  "ece": 0.249599609375,
+  "latency_p50_ms": 87.3,
+  "latency_p99_ms": 112.2,
+  "dataset": "supergpqa",
+  "model": "yuyu199741/raya-decision-v1"
+}

@@ -1,0 +1,10 @@
+{
+  "accuracy": 0.785,
+  "correct": 157,
+  "total": 200,
+  "ece": 0.08164062500000001,
+  "latency_p50_ms": 44.5,
+  "latency_p99_ms": 114.0,
+  "dataset": "ag_news",
+  "model": "yuyu199741/raya-decision-v1"
+}
