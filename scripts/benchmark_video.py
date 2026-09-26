@@ -1,4 +1,4 @@
-"""Compare sparse seek with bounded sequential decoding of the same eight timestamps."""
+"""Compare sparse seek with bounded sequential decoding of the same 1fps timestamps."""
 
 import argparse
 import json
@@ -22,13 +22,14 @@ def main():
     for path in args.paths:
         data = path.read_bytes()
         by_strategy = {}
-        for strategy in ("seek", "sequential"):
+        for strategy in ("auto", "seek", "sequential"):
             samples = [sample_video(data, settings, strategy) for _ in range(args.runs)]
             by_strategy[strategy] = samples[-1]
             rows.append(
                 {
                     "file": path.name,
                     "strategy": strategy,
+                    "selected_strategy": samples[-1].strategy,
                     "runs": args.runs,
                     "median_ms": round(statistics.median(x.decode_ms for x in samples), 3),
                     "decoded_frames": samples[-1].decoded_frames,
@@ -39,6 +40,9 @@ def main():
         sparse, sequential = by_strategy["seek"], by_strategy["sequential"]
         assert sparse.indices == sequential.indices, "Sampling timestamps changed"
         np.testing.assert_array_equal(sparse.frames, sequential.frames)
+        automatic = by_strategy["auto"]
+        assert automatic.indices == sequential.indices
+        np.testing.assert_array_equal(automatic.frames, sequential.frames)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(rows, indent=2) + "\n")
     print(json.dumps(rows, indent=2))

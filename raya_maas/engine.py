@@ -118,7 +118,16 @@ class DecisionEngine:
                 metadata.append(sample.metadata())
                 video_stats.append(
                     {
-                        "sampled_frames": 8,
+                        "sampling_fps": sample.sampling_fps,
+                        "sampled_frames": len(sample.frames),
+                        "processor_frames": len(sample.frames) + len(sample.frames) % 2,
+                        "decoder": sample.decoder,
+                        "duration_seconds": sample.duration,
+                        "source_fps": sample.fps,
+                        "sampled_indices": sample.indices,
+                        "sampled_timestamps_seconds": [
+                            round(i / sample.fps, 6) for i in sample.indices
+                        ],
                         "decoded_frames": sample.decoded_frames,
                         "strategy": sample.strategy,
                         "decode_ms": sample.decode_ms,
@@ -138,12 +147,12 @@ class DecisionEngine:
                 videos_kwargs={
                     "video_metadata": metadata,
                     "do_sample_frames": False,
-                    "fps": None,
-                    "num_frames": 8,
+                    "fps": 1,
+                    "num_frames": None,
                     "cap_pixels_per_frame": True,
                     "size": {
                         "shortest_edge": 65536,
-                        "longest_edge": self.settings.video_max_pixels * 8,
+                        "longest_edge": self.settings.video_max_pixels * len(videos[0]),
                     },
                 },
             )

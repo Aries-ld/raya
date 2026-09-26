@@ -66,10 +66,10 @@ def video():
     return buffer.getvalue()
 
 
-def test_sparse_decode_matches_sequential_and_has_eight_frames(settings, video):
+def test_sparse_decode_matches_sequential_at_one_fps(settings, video):
     sparse = sample_video(video, settings)
     baseline = sample_video(video, settings, "sequential")
-    assert sparse.frames.shape == (8, 48, 64, 3)
+    assert sparse.frames.shape == (4, 48, 64, 3)
     assert sparse.indices == baseline.indices
     np.testing.assert_array_equal(sparse.frames, baseline.frames)
     assert sparse.decoded_frames < baseline.decoded_frames
@@ -78,7 +78,7 @@ def test_sparse_decode_matches_sequential_and_has_eight_frames(settings, video):
 
 
 def test_video_duration_budget(settings, video):
-    settings.max_video_seconds = 1
+    settings.max_video_seconds = 3
     with pytest.raises(APIError, match="seconds"):
         sample_video(video, settings)
 

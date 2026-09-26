@@ -132,6 +132,10 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
                         "score_levels": 10,
                         "questions": 16,
                         "input_tokens_per_question": settings.max_input_tokens,
+                        "min_video_seconds": settings.min_video_seconds,
+                        "max_video_seconds": settings.max_video_seconds,
+                        "video_sampling_fps": 1,
+                        "video_min_sample_frames": 4,
                     },
                 }
             ]

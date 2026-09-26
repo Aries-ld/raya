@@ -1,5 +1,9 @@
 # 原生决策协议验收
 
+当前采样已改为 **fps=1**，最新短长视频对比与性能结论见 [fps1-validation.md](fps1-validation.md)。后文8帧相关记录属于历史基线。
+
+最新视频链路检查、3–20 秒接口限制及 10 秒样例 RT 见 [video-audit.md](video-audit.md)。下方保留历史测试记录，旧 30/60 秒视频现在会被接口拒绝。
+
 日期：2026-09-27。Apple Silicon arm64，24GiB 内存，Python 3.12、torch 2.10.0、Transformers 5.17.0。模型与 processor revision 固定在 `raya_maas/download.py`，本地下载记录在 `models/manifest.json`。
 
 本记录验证 Raya 实现的决策协议与真实模型调用，不是 Jev 性能对比或 Raya 训练校准复测。
@@ -8,7 +12,7 @@
 
 正式接口为 `POST /v1/systemone`，请求顶层仅 `model / state / questions`，成功响应仅 `model / answers / usage`。图片、视频在 `state.media` 中显式提供，问题在 `questions.*.instructions`，选择项在 `criteria`。
 
-41 项自动测试通过。覆盖：
+59 项自动测试通过。覆盖：
 
 - choice 原选项 ID 映射、score 概率加权计算、noul 是的概率，以及混合问题响应。
 - 缺少 state/questions/instructions/criteria、非法问题类型、候选/等级/问题数量越界的 422。

@@ -14,13 +14,13 @@
     "source": "/Users/lindong/PycharmProjects/mneme/联调/workbench_runs/bedroom_01_0s_20clip_v2_20260713-155631/clips/clip002.mp4",
     "source_sha256": "5c87bfd87f02ec36e90ed52f7772e710bd13d79beef86b52179c83c882e4a9de",
     "source_clip_start_seconds": 0,
-    "duration_seconds": 30,
+    "duration_seconds": 10,
     "transform": [
       "ffmpeg",
       "-i",
       "/Users/lindong/PycharmProjects/mneme/联调/workbench_runs/bedroom_01_0s_20clip_v2_20260713-155631/clips/clip002.mp4",
       "-t",
-      "30",
+      "10",
       "-an",
       "-vf",
       "fps=30",
@@ -40,11 +40,11 @@
       "width": 1578,
       "height": 720,
       "avg_frame_rate": "30/1",
-      "duration": "30.000000",
-      "nb_frames": "900"
+      "duration": "10.000000",
+      "nb_frames": "300"
     },
     "training_overlap": "unknown; local training manifest unavailable",
-    "sha256": "5744a0f198cba374ffec69e9af76be347b477a0b256fe3eb3db0a6721f6dcf04",
-    "bytes": 15220432
+    "sha256": "f578692119976cda0259d9a7f506b6843e54ea704f72c3585335f6f1b73c4000",
+    "bytes": 5242838
   }
 ]

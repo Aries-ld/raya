@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `run_text.py` | `text.json` | state 中的文字 |
 | `run_image.py` | `image.json` | `image.jpg` |
-| `run_video.py` | `video.json` | `video.mp4`，30 秒 m3bench 片段 |
+| `run_video.py` | `video.json` | `video.mp4`，10 秒 m3bench 片段 |
 
 JSON 分成三个部分：
 
@@ -30,6 +30,8 @@ PyCharm 解释器选择项目 `.venv/bin/python`，无需参数、API key 或 HT
 
 文件中的 `file:./image.jpg` / `file:./video.mp4` 是本地测试加载器的便利语法，运行时转换成 data URL；HTTP 服务不支持 file URL。可以直接替换同名媒体，也可直接修改 JSON 中的相对文件路径，路径相对于 JSON 所在目录。
 
-默认视频：m3bench `bedroom_01` 派生 `clip002.mp4` 前 30 秒，H.264、30fps、900 帧、无音轨。视频问题问“红色纸盒里是什么食物”，并提供四个明确候选。模型仍固定采样 8 帧。是否参与过训练未知，不能把这条样例当作严格的未见数据评测。
+默认视频：m3bench `bedroom_01` 派生 `clip002.mp4` 前 10 秒，H.264、30fps、300 帧、无音轨。视频问题问“红色纸盒里是什么食物”，并提供四个明确候选。当前按 fps=1 采样，这条 10 秒视频取 10 帧。是否参与过训练未知，不能把这条样例当作严格的未见数据评测。
 
 媒体已准备在本机，不进 Git；来源、转换参数、SHA256 在 `provenance.json`。完整协议及差异见 [docs/api.md](../docs/api.md)。
+
+接口只接受 3–20 秒视频（含边界），默认样例已调整为 10.000 秒；采样采用 Qwen fps=1 规则：3 秒通常取 4 帧，10 秒取 10 帧，20 秒取 20 帧，奇数帧由 processor 补齐。

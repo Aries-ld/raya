@@ -12,7 +12,7 @@ PyCharm 解释器选本项目 `.venv/bin/python`。在 `local_tests/` 中编辑 
 | --- | --- | --- |
 | `local_tests/run_text.py` | `local_tests/text.json` | 文字在 `state` 中；示例含 choice/noul/score 三个问题 |
 | `local_tests/run_image.py` | `local_tests/image.json` | `local_tests/image.jpg` |
-| `local_tests/run_video.py` | `local_tests/video.json` | `local_tests/video.mp4`，m3bench 的 30 秒片段 |
+| `local_tests/run_video.py` | `local_tests/video.json` | `local_tests/video.mp4`，m3bench 的 10 秒片段 |
 
 每份 JSON 中都能直接看到 `state`、`questions.*.instructions` 和 `criteria`。替换媒体可保持文件名不变；换问题就同时调整判断标准。在 `request = load_request_file(...)` 和 `return result` 打断点可分别检查完整请求与响应。
 
@@ -147,10 +147,12 @@ print(response.json()["answers"]["held_object"])
 | 文本 | 完整内部文本 ≤65536 字符；候选渲染后 ≤2048 字符 |
 | 媒体 | 默认最多 4 个，最多 1 个视频；每个 ≤64MiB |
 | 图片/视频帧 | 原始像素 ≤2000 万；预处理图片预算 262144 像素、视频每帧 131072 |
-| 视频 | 默认 ≤60 秒，固定抽取 8 帧 |
+| 视频 | **3–20 秒（含边界）**，服务端检查时长，按 Qwen `fps=1` 采样 |
 | HTTP 请求体 | ≤96MiB（包括 base64 开销） |
 
-这些是工程预算，可按 [配置](raya_maas/config.py) 中的 `RAYA_*` 调整，受字段验证上限约束。超限明确报错，不静默截断文字或视频时长。
+视频时长范围是接口约束，环境变量只能在 3–20 秒内收紧；超限返回 422 / `video_duration_out_of_range`，不会自动截短。
+
+其他工程预算可按 [配置](raya_maas/config.py) 中的 `RAYA_*` 调整，受字段验证上限约束。超限明确报错，不静默截断文字或视频时长。
 
 Raya 的 `confidence=max(probabilities)`。Jev 官方只说明 confidence 从分布计算，未在所查文档公开精确公式，所以**协议结构对齐不等于置信度数值或校准行为相同**。`noul` / `score` 由 Raya 候选分布映射，未另外宣称经过 Jev 的专项校准。门控阈值由调用方设置。
 
@@ -158,9 +160,18 @@ Raya 的 `confidence=max(probabilities)`。Jev 官方只说明 confidence 从分
 
 ## 视频性能与运行
 
-PyAV/FFmpeg 对 8 个均匀时间点 seek，只解码附近 GOP，仅对选中帧缩放和 RGB 转换；失败时回退到有帧数/时间预算的顺序解码。保留时间元数据，processor 不再次采样，并限制每帧像素。只保留末位 logits，不用 KV cache。
+PyAV/FFmpeg 按 Qwen `fps=1` 计算采样数量并均匀取帧，先读取关键帧索引估算解码工作量，自动选择 seek 或一次顺序解码，避免短视频长 GOP 被反复解码。仅对选中帧缩放和 RGB 转换；seek 失败时回退到有预算的顺序解码。保留时间元数据，processor 不再次采样，并限制每帧像素。只保留末位 logits，不用 KV cache。
 
-此前相同采样帧逐像素一致的对比：60 秒 kitchen 解码中位数 2472.8ms → 304.0ms（约 8.1 倍）；约 12 秒 living 为 783.4ms → 288.4ms。此结果仅是 CPU 解码，不是新 30 秒片段或 CUDA 端到端性能。
+当前默认使用 8 线程 CPU 解码；在本机的 10 秒样例上，1 线程约 637ms、8 线程约 129ms，
+VideoToolbox 约 481ms，选中帧逐像素一致，所以不默认启用硬件解码。可用
+`RAYA_VIDEO_DECODE_THREADS` 调整线程数；`RAYA_VIDEO_DECODER=videotoolbox/cuda/auto` 用于
+显式硬件解码实验，auto 在硬件不可用时回退软件。CUDA 解码尚未实机验证。
+
+采样与原生 Qwen `fps=1, num_frames=None` 规则一致：按源帧数/帧率计算数量，至少 4 帧
+（若源视频足够），再均匀选点；不是严格在整数秒取帧。3 秒通常取 4 帧，10 秒取 10 帧，20 秒取
+20 帧。奇数帧由 processor 重复末帧补成偶数，保留原始时间戳，不再次采样。
+每帧分辨率预算保持不变，总像素预算按采样帧数增长。实时数据与 8 帧对比见
+[1fps 验收报告](docs/fps1-validation.md)。
 
 单进程、单模型 worker；默认等待队列 8，满时返回 429。请求超时默认 120 秒返回 504；超时不会提前释放仍在执行的 worker，也不会触发重叠前向。禁止为同一 GPU 盲目增加 Uvicorn worker，扩容使用独立实例。
 
@@ -181,9 +192,11 @@ uv run ruff check raya_maas scripts local_tests tests
 uv run pytest -q
 # 对已经启动的原生服务进行真实多模态 HTTP 检查（从 .env 读取密钥）
 uv run python scripts/smoke.py
+# 检查真实模型的视频/图片分支，并对当前 10 秒样例测 3 次 RT
+uv run python scripts/audit_video.py
 # 视频解码对比
 uv run python scripts/benchmark_video.py \
-  tests/fixtures/m3bench_kitchen.mp4 tests/fixtures/m3bench_living.mp4 --runs 3
+  local_tests/video.mp4 tests/fixtures/m3bench_living.mp4 --runs 3
 ```
 
 容器非 root，模型只读挂载。CUDA 实机和容器构建尚未验证；MPS/CPU 与解码测试见 [验收记录](docs/validation.md)。已有 bench 的来源记录在 `local_tests/provenance.json` 和 `tests/fixtures/provenance.json`，不据此假设未参与模型训练。

@@ -1,8 +1,13 @@
 {
   "model": "raya-decision-v1",
   "state": {
-    "text": "观察这段 30 秒视频中的红色纸盒。",
-    "media": [{"type": "video", "url": "file:./video.mp4"}]
+    "text": "观察这段 10 秒视频中的红色纸盒。",
+    "media": [
+      {
+        "type": "video",
+        "url": "file:./video.mp4"
+      }
+    ]
   },
   "questions": {
     "food_in_box": {

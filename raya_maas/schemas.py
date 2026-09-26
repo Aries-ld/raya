@@ -15,7 +15,11 @@ class StrictModel(BaseModel):
 
 class Media(StrictModel):
     type: Literal["image", "video"]
-    url: str = Field(min_length=1)
+    url: str = Field(
+        min_length=1,
+        description="Matching base64 data URL or trusted HTTPS URL. Video duration must be "
+        "3–20 seconds inclusive; sampled with Qwen fps=1 rules. The server checks stream metadata.",
+    )
 
     @model_validator(mode="after")
     def check_url(self):

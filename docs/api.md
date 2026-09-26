@@ -121,7 +121,10 @@ Jev 当前只支持文本。Raya 顶层保持相同字段，在 `state` 中保�
 
 ## 限制和错误
 
-当前默认：每个问题完整输入 4096 token，state 与 instructions 合成后的内部文本最多 65536 字符，候选渲染后最多 2048 字符；每个 criteria 描述序列化后最多 1900 字符。媒体 64MiB/个，原始帧 2000 万像素，视频 60 秒、8 帧，HTTP 请求体 96MiB。设置项见 `raya_maas/config.py`。
+当前默认：每个问题完整输入 4096 token，state 与 instructions 合成后的内部文本最多 65536 字符，候选渲染后最多 2048 字符；每个 criteria 描述序列化后最多 1900 字符。媒体 64MiB/个，原始帧 2000 万像素，视频 **3–20 秒（含边界）**、按 Qwen fps=1 采样，HTTP 请求体 96MiB。设置项见 `raya_maas/config.py`。视频时长以服务端读取的视频流元数据为准，
+在抽帧和模型前向之前校验。超限返回 HTTP 422，错误码 `video_duration_out_of_range`；
+不相信客户端自报时长，也不自动裁剪。`RAYA_MIN_VIDEO_SECONDS` / `RAYA_MAX_VIDEO_SECONDS`
+只能收紧 3–20 秒范围，不能放宽。
 
 验证在执行前检查全部问题结构；视觉展开后的 token 上限在每个问题预处理后检查。失败时整次 HTTP 请求返回错误，不返回部分 answers。
 
@@ -139,3 +142,12 @@ Jev 当前只支持文本。Raya 顶层保持相同字段，在 `state` 中保�
 | 504 | 请求等待/推理超时 |
 
 Jev 官方还使用 529；Raya 此版本未提供相同的过载服务实现。未知参数不静默忽略。API key、媒体 URL、模型名需按 Raya 配置替换，不能声称直接复用 Jev 的密钥和模型。
+
+## 视频采样语义
+
+默认使用与 Qwen 视频 processor 相同的 `fps=1, num_frames=None` 规则：根据视频原始
+帧数和帧率决定数量，通常至少 4 帧，然后在全片均匀取点。3 秒/10 秒/20 秒视频通常分别
+采样 4/10/20 帧；奇数帧在编码时复制末帧以满足 temporal_patch_size=2。
+采样 fps=1 与原视频帧率分开保存，时间戳按源帧率和采样位置计算。
+工程先完成采样，再用 `do_sample_frames=False` 交给视频 processor，避免再次抽帧。
+像素预算按实际帧数增长；token 超过上限仍返回 422，不静默截断。

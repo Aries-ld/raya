@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,7 +22,10 @@ class Settings(BaseSettings):
     max_image_pixels: int = Field(20_000_000, gt=0)
     image_max_pixels: int = Field(262144, ge=65536)
     video_max_pixels: int = Field(131072, ge=65536)
-    max_video_seconds: float = Field(60, gt=0, le=600)
+    video_decoder: Literal["auto", "software", "videotoolbox", "cuda"] = "software"
+    video_decode_threads: int = Field(8, ge=1, le=16)
+    min_video_seconds: float = Field(3, ge=3, le=20)
+    max_video_seconds: float = Field(20, ge=3, le=20)
     max_video_decode_frames: int = Field(18000, gt=0)
     max_media: int = Field(4, ge=1, le=8)
     media_hosts: str = ""
@@ -30,6 +33,12 @@ class Settings(BaseSettings):
     request_timeout: float = Field(120, gt=0)
     media_timeout: float = Field(15, gt=0)
     cpu_threads: int = Field(4, ge=1)
+
+    @model_validator(mode="after")
+    def check_video_range(self):
+        if self.min_video_seconds > self.max_video_seconds:
+            raise ValueError("min_video_seconds must not exceed max_video_seconds")
+        return self
 
     @property
     def keys(self) -> list[str]:
