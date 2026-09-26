@@ -1,52 +1,21 @@
-# Raya
+<h1 align="center">Raya</h1>
+<p align="center"><strong>面向文字、图片和视频的 System 1 决策服务</strong></p>
 
-**面向文字、图片和短视频的多模态决策服务。**
+<div align="center">
 
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Raya%20v1-FFD21E)](https://huggingface.co/yuyu199741/raya-decision-v1)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-Raya%20v1-FFD21E)](https://huggingface.co/yuyu199741/raya-decision-v1)
 [![Base Model](https://img.shields.io/badge/Base%20Model-Qwen3.5--2B-7C3AED)](https://huggingface.co/Qwen/Qwen3.5-2B)
+[![API Docs](https://img.shields.io/badge/Docs-API-2ea44f)](docs/api.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
 
 [English](README.md) | **简体中文**
 
-[接口文档](docs/api.md) · [OpenAPI](docs/openapi.json) · [调用示例](docs/examples/)
+[快速启动](#快速启动) · [接口文档](docs/api.md) · [调用示例](docs/examples/)
 
-Raya 基于 Qwen3.5-2B 后训练权重，为文字、图片和短视频提供候选选择、等级评分与是/否概率判断。每个问题执行一次模型前向，通过候选标签的分数计算概率，并由服务代码组装 JSON；不进行自回归文本生成。
+</div>
 
-本仓库聚焦模型下载、推理服务、协议校验和验证工具。训练代码、模型权重、原始测试媒体与密钥不随当前代码分发。
-
-## 模型信息
-
-| 项目 | 来源 |
-| --- | --- |
-| Raya v1 权重 | [yuyu199741/raya-decision-v1](https://huggingface.co/yuyu199741/raya-decision-v1) |
-| 后训练基座 | [Qwen/Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B) |
-| 分词器 | 来自 Raya checkpoint |
-| 视觉预处理器 | 来自 Qwen3.5-2B |
-| 版本锁定 | 在 [download.py](raya_maas/download.py) 中固定模型仓库提交 |
-
-首次下载的模型权重约 4.4 GB。下载清单写入 `models/manifest.json`；运行服务时只读取本地文件。
-
-## 能力与协议
-
-| 能力 | 行为 |
-| --- | --- |
-| 文字 | 自然语言或结构化 JSON 材料 |
-| 图片 | 文字上下文与图片共同判断 |
-| 视频 | 3–20 秒，Qwen `fps=1` 采样，仅处理画面 |
-| `choice` | 从 2–26 个选项中选择，返回完整概率分布 |
-| `score` | 对 2–10 个有序等级计算期望分数 |
-| `noul` | 返回“是”的概率 |
-| 多问题 | 一次请求 1–16 个独立问题 |
-| 运行设备 | 自动按 CUDA → MPS → CPU 选择与故障降级 |
-
-正式接口为 **`POST /v1/systemone`**：
-
-```text
-model + state + questions  →  model + answers + usage
-```
-
-协议采用 Jev System One 风格；图片与视频通过 `state.media` 扩展。Raya 使用自己的模型、候选概率定义和执行实现，不声称复现 Jev 的全部能力、校准结果或吞吐。当前不提供聊天 completion、流式文本生成或工具调用。
+基于 Qwen3.5-2B 后训练模型，提供 **候选选择、等级评分与是/否概率判断**。每个问题通过一次模型前向得到候选概率，直接返回结构化 JSON，无需生成或解析自由文本。
 
 ## 快速启动
 
@@ -137,6 +106,52 @@ python3 docs/examples/call_raya.py --request docs/examples/video-request.json --
 ```
 
 图片与视频脚本会自动生成 Base64 data URL。HTTP 接口不接受本地路径；HTTPS 媒体域名需要由维护者加入白名单。
+
+## 文档
+
+| 入口 | 内容 |
+| --- | --- |
+| [API 接入文档](docs/api.md) | 鉴权、问题类型、媒体上传、响应格式、错误与重试 |
+| [OpenAPI 定义](docs/openapi.json) | 机器可读的请求与响应协议 |
+| [调用示例](docs/examples/) | 仅依赖 Python 标准库的客户端与三种模态请求模板 |
+| [配置示例](.env.example) | 设备、模型路径、请求限制与解码参数 |
+
+## 工作原理与能力
+
+| 能力 | 行为 |
+| --- | --- |
+| 文字 | 自然语言或结构化 JSON 材料 |
+| 图片 | 文字上下文与图片共同判断 |
+| 视频 | 3–20 秒，Qwen `fps=1` 采样，仅处理画面 |
+| `choice` | 从 2–26 个选项中选择，返回完整概率分布 |
+| `score` | 对 2–10 个有序等级计算期望分数 |
+| `noul` | 返回“是”的概率 |
+| 多问题 | 一次请求 1–16 个独立问题 |
+| 运行设备 | 自动按 CUDA → MPS → CPU 选择与故障降级 |
+
+正式接口为 **`POST /v1/systemone`**：
+
+```text
+model + state + questions  →  model + answers + usage
+```
+
+协议采用 Jev System One 风格；图片与视频通过 `state.media` 扩展。Raya 使用自己的模型、候选概率定义和执行实现，不声称复现 Jev 的全部能力、校准结果或吞吐。当前不提供聊天 completion、流式文本生成或工具调用。
+
+```text
+材料与候选 → 多模态预处理 → 每问题一次前向 → 候选概率 → JSON 答案
+```
+
+## 模型信息
+
+| 项目 | 来源 |
+| --- | --- |
+| Raya v1 权重 | [yuyu199741/raya-decision-v1](https://huggingface.co/yuyu199741/raya-decision-v1) |
+| 后训练基座 | [Qwen/Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B) |
+| 分词器 | 来自 Raya checkpoint |
+| 视觉预处理器 | 来自 Qwen3.5-2B |
+| 版本锁定 | 在 [download.py](raya_maas/download.py) 中固定模型仓库提交 |
+
+首次下载的模型权重约 4.4 GB。下载清单写入 `models/manifest.json`；运行服务时只读取本地文件。
 
 ## 默认限制
 

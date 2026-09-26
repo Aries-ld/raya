@@ -1,52 +1,21 @@
-# Raya
+<h1 align="center">Raya</h1>
+<p align="center"><strong>System 1 decisions over text, images, and video</strong></p>
 
-**Multimodal decisions from text, images, and short videos.**
+<div align="center">
 
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Raya%20v1-FFD21E)](https://huggingface.co/yuyu199741/raya-decision-v1)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-Raya%20v1-FFD21E)](https://huggingface.co/yuyu199741/raya-decision-v1)
 [![Base Model](https://img.shields.io/badge/Base%20Model-Qwen3.5--2B-7C3AED)](https://huggingface.co/Qwen/Qwen3.5-2B)
+[![API Docs](https://img.shields.io/badge/Docs-API-2ea44f)](docs/api.md)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
 
 **English** | [简体中文](README.zh-CN.md)
 
-[API guide (Chinese)](docs/api.md) · [OpenAPI](docs/openapi.json) · [Client examples](docs/examples/)
+[Quick start](#quick-start) · [API guide](docs/api.md) · [Examples](docs/examples/)
 
-Raya serves a post-trained Qwen3.5-2B checkpoint for candidate selection, ordinal scoring, and yes/no probability judgments over text, images, and short videos. Each question uses one model forward pass. Candidate-label scores determine the probabilities; application code assembles the JSON response without autoregressive text generation.
+</div>
 
-This repository focuses on model acquisition, inference serving, request validation, and verification tools. Training code, model weights, raw test media, and credentials are not distributed with the current source tree.
-
-## Model artifacts
-
-| Item | Source |
-| --- | --- |
-| Decision checkpoint | [yuyu199741/raya-decision-v1](https://huggingface.co/yuyu199741/raya-decision-v1) |
-| Base model | [Qwen/Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B) |
-| Tokenizer | Loaded from the Raya checkpoint |
-| Vision processor | Loaded from Qwen3.5-2B |
-| Revision pinning | Repository commits pinned in [download.py](raya_maas/download.py) |
-
-The initial model weights download is approximately 4.4GB. Downloaded revisions are recorded in `models/manifest.json`; serving uses local files only.
-
-## Capabilities and contract
-
-| Capability | Behavior |
-| --- | --- |
-| Text | Natural-language or structured JSON context |
-| Images | Decisions over text context and image inputs |
-| Video | 3–20 seconds, Qwen `fps=1` sampling, visual content only |
-| `choice` | Select from 2–26 options with a full probability distribution |
-| `score` | Return an expected score over 2–10 ordered levels |
-| `noul` | Return the probability of yes |
-| Multiple questions | 1–16 independent questions per request |
-| Devices | Automatic CUDA → MPS → CPU selection and backend fallback |
-
-The decision endpoint is **`POST /v1/systemone`**:
-
-```text
-model + state + questions  →  model + answers + usage
-```
-
-The API follows the Jev System One request/response style, with images and videos added through `state.media`. Raya uses its own checkpoint, confidence definition, and execution implementation; it does not claim to reproduce Jev's full capabilities, calibration, or throughput. Chat completions, streaming text generation, and tool calling are not provided.
+A decision service built on a post-trained Qwen3.5-2B checkpoint. Ask **choice, score, and yes/no questions** over text, images, or short videos. Each question uses one forward pass and returns structured JSON, with no free-form text generation to parse.
 
 ## Quick start
 
@@ -137,6 +106,52 @@ python3 docs/examples/call_raya.py --request docs/examples/video-request.json --
 ```
 
 For media requests, the client converts local files to Base64 data URLs. The HTTP API does not accept local file paths; remote HTTPS media hosts must be allowlisted by the operator.
+
+## Documentation
+
+| Resource | Contents |
+| --- | --- |
+| [API integration guide (Chinese)](docs/api.md) | Authentication, question types, media, responses, errors, and retries |
+| [OpenAPI schema](docs/openapi.json) | Machine-readable request and response definitions |
+| [Client examples](docs/examples/) | A standard-library Python client and request templates for all three modalities |
+| [Configuration](.env.example) | Device selection, model paths, request limits, and decoding settings |
+
+## How it works
+
+| Capability | Behavior |
+| --- | --- |
+| Text | Natural-language or structured JSON context |
+| Images | Decisions over text context and image inputs |
+| Video | 3–20 seconds, Qwen `fps=1` sampling, visual content only |
+| `choice` | Select from 2–26 options with a full probability distribution |
+| `score` | Return an expected score over 2–10 ordered levels |
+| `noul` | Return the probability of yes |
+| Multiple questions | 1–16 independent questions per request |
+| Devices | Automatic CUDA → MPS → CPU selection and backend fallback |
+
+The decision endpoint is **`POST /v1/systemone`**:
+
+```text
+model + state + questions  →  model + answers + usage
+```
+
+The API follows the Jev System One request/response style, with images and videos added through `state.media`. Raya uses its own checkpoint, confidence definition, and execution implementation; it does not claim to reproduce Jev's full capabilities, calibration, or throughput. Chat completions, streaming text generation, and tool calling are not provided.
+
+```text
+Context + options → multimodal preprocessing → one forward per question → probabilities → JSON
+```
+
+## Model artifacts
+
+| Item | Source |
+| --- | --- |
+| Decision checkpoint | [yuyu199741/raya-decision-v1](https://huggingface.co/yuyu199741/raya-decision-v1) |
+| Base model | [Qwen/Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B) |
+| Tokenizer | Loaded from the Raya checkpoint |
+| Vision processor | Loaded from Qwen3.5-2B |
+| Revision pinning | Repository commits pinned in [download.py](raya_maas/download.py) |
+
+The initial model weights download is approximately 4.4GB. Downloaded revisions are recorded in `models/manifest.json`; serving uses local files only.
 
 ## Default limits
 
