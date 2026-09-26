@@ -157,30 +157,21 @@ docker compose -f compose.yaml -f compose.cuda.yaml up -d --build
 
 ```bash
 # 直接运行默认示例
-uv run python scripts/test_text.py
-uv run python scripts/test_image.py
-uv run python scripts/test_video.py
+uv run python local_tests/test_text.py
+uv run python local_tests/test_image.py
+uv run python local_tests/test_video.py
 
-# 换问题、候选与路径；路径带空格时加引号
-uv run python scripts/test_text.py \
-  --question "请取消明天的会议。这是什么意图？" \
-  --candidates "修改会议" "创建会议" "取消会议"
-
-uv run python scripts/test_image.py \
-  --image "/path/to/photo.jpg" --question "图中主要是什么动物？" \
-  --candidates "猫" "狗" "鸟" "没有动物"
-
-uv run python scripts/test_video.py \
-  --video "/path/to/clip.mp4" --question "视频主要发生在哪里？" \
-  --candidates "厨房" "客厅" "街道" "海边"
 ```
 
-也可以直接编辑每个脚本顶部的 `QUESTION`、`CANDIDATES`、`IMAGE_PATH` / `VIDEO_PATH`。
-PyCharm 中将项目解释器选为本项目 `.venv/bin/python`，打开任一脚本，直接右键 Run 或 Debug，
-无需填写命令行参数。可在 `main()` 的 `run_local_test(...)` 或 `return result` 行打断点，
-也可进入 `raya_maas/local_test.py` 的 `engine.load()`、`engine.predict(request)` 调试。
-脚本自动定位项目源码、`.env` 和模型目录，不依赖 IDE 的 Working directory；相对媒体路径和
-`--output` 路径均相对于项目根目录。`DEVICE` 和 `THRESHOLD` 也可在脚本顶部修改。
+日常测试直接打开 `local_tests/`：编辑 `text.txt`、`image.txt`、`video.txt` 中的问题与候选；
+图片和视频分别替换同目录的 `image.jpg`、`video.mp4`，无需修改启动参数或脚本变量。
+默认视频已经准备为 m3bench `bedroom_01` 的 30 秒片段，来源见 `local_tests/provenance.json`。
+详细操作见 [local_tests/README.md](local_tests/README.md)。
+
+PyCharm 中将项目解释器选为本项目 `.venv/bin/python`，打开任一脚本，直接右键 Run 或 Debug。
+可在 `main()` 的 `return result` 打断点查看结果，也可进入 `raya_maas/local_test.py` 的
+`engine.load()`、`engine.predict(request)` 调试。脚本自动定位输入素材、`.env` 和模型，
+不依赖 IDE 的 Working directory。命令行参数仍可临时覆盖文件中的默认问题/候选/素材。
 候选必须随问题一起调整，模型只能从候选中选择。输出包括所选标签/文本、各项概率、置信度、
 实际设备、token 数、推理耗时；视频另有采样帧数、实际解码帧数和解码耗时。
 
@@ -192,7 +183,7 @@ PyCharm 中将项目解释器选为本项目 `.venv/bin/python`，打开任一�
 ### 工程与 HTTP 接口测试
 
 ```bash
-uv run ruff check raya_maas scripts tests
+uv run ruff check raya_maas scripts local_tests tests
 uv run pytest -q
 
 # 本机已经备好样例；在另一台有原 bench 的机器上可以重建

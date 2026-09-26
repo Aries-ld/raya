@@ -6,6 +6,8 @@
 /artifacts/
 /tests/fixtures/*.mp4
 /tests/fixtures/*.jpg
+/local_tests/image.jpg
+/local_tests/video.mp4
 __pycache__/
 *.py[cod]
 .pytest_cache/

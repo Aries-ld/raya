@@ -43,6 +43,14 @@ CPU FP32 单独加载真实权重，英文取消预约结果同为 B，置信度
 `artifacts/local-image.json`、`artifacts/local-video.json`。另检查三个脚本的 `--help`，
 以及不存在的图片路径会在加载模型前报告输入错误。新增脚本后原有 32 项自动测试、格式检查仍通过。
 
+后续将三个入口统一迁移至 `local_tests/`，默认读取同目录的 `text.txt`、`image.txt`、
+`video.txt` 和 `image.jpg`、`video.mp4`，不再要求编辑脚本变量。
+新视频来自 m3bench `bedroom_01` 派生片段 `clip002.mp4`，裁剪并转码后 ffprobe
+验证时长为 30.000 秒、30fps、900 帧。使用 `/tmp` 作为工作目录，无启动参数运行三个脚本，
+真实 MPS 推理分别返回「重置登录密码」「篮球」「薯条」，均匹配人工检查的默认预期。
+结果在 `artifacts/default-files-{text,image,video}.json`。原有 32 项自动测试仍通过。
+新视频仅可确认不同于此前的 kitchen/living 自测素材，训练数据重叠情况未知。
+
 ## 视频解码优化
 
 `scripts/benchmark_video.py`，相同数据、相同 8 个采样时间点、相同 FFmpeg 缩放和 RGB 格式，分别运行 3 次，取中位数。计时仅包含视频解码/采样/缩放，不含读磁盘、HTTP 上传或模型前向。

@@ -4,6 +4,7 @@
 .env.*
 models
 tests
+local_tests
 artifacts
 .idea
 __pycache__

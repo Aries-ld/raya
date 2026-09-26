@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from .config import Settings
 from .errors import APIError
-from .schemas import ChatRequest
+from .schemas import ChatRequest, render
 
 
 def build_request(args, settings: Settings, modality: str) -> ChatRequest:
@@ -42,7 +42,7 @@ def build_request(args, settings: Settings, modality: str) -> ChatRequest:
 def run_local_test(
     modality: str,
     question: str,
-    candidates: list[str],
+    candidates: list[str] | None,
     media_path: Path | None = None,
     *,
     project_root: Path | None = None,
@@ -78,6 +78,7 @@ def run_local_test(
             path = Path(getattr(args, modality)).expanduser()
             setattr(args, modality, path if path.is_absolute() else root / path)
         request = build_request(args, settings, modality)
+        render(request)  # Validate editable inline options before loading the model.
     except (OSError, ValueError, ValidationError) as exc:
         parser.exit(2, f"输入错误：{exc}\n")
 
@@ -104,3 +105,16 @@ def run_local_test(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(output, encoding="utf-8")
     return result
+
+
+def run_case_file(modality: str, directory: Path) -> dict:
+    """Fixed, editable files beside the IDE entry scripts; no launch configuration needed."""
+    directory = directory.resolve()
+    question_path = directory / f"{modality}.txt"
+    question = question_path.read_text(encoding="utf-8-sig").strip()
+    media_path = (
+        None
+        if modality == "text"
+        else directory / ("image.jpg" if modality == "image" else "video.mp4")
+    )
+    return run_local_test(modality, question, None, media_path, project_root=directory.parent)
