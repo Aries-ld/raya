@@ -6,12 +6,6 @@ Raya v1 是基于 Qwen3.5-2B 的多模态候选决策模型。服务采用 **Jev
 
 ## 先直接测试，不启动服务
 
-**反复测试推荐运行 `local_tests/run_session.py`（或 PyCharm 配置 `Raya Session`）。**
-首次加载模型并运行图片测试后，进程保持运行：修改 JSON/媒体并保存，在 Run/Debug 控制台按回车
-即可重新推理；输入 `text`、`image`、`video` 可切换模态，复用同一模型，输入 `q` 退出。
-每轮都重读请求和媒体文件，输入错误可修复后重试，模型不重新加载。
-不要点击 IDE 的重新运行按钮：那会新建进程，仍需重新加载。改 Python 代码或模型配置后需要重启。
-
 PyCharm 解释器选本项目 `.venv/bin/python`。在 `local_tests/` 中编辑 JSON，再对相应脚本右键 Run / Debug。无需启动参数或 API key。
 
 | 运行脚本 | 编辑的完整请求 | 默认媒体 |
@@ -30,11 +24,11 @@ uv run python local_tests/run_image.py
 uv run python local_tests/run_video.py
 ```
 
-三个单次运行脚本仍在退出时释放模型；重复调试用 `run_session.py` 保持模型驻留。
-决策响应的字段不变。交互入口还会输出操作提示；本地模型加载时间、设备、各问题前向与视频解码
-耗时写入 `artifacts/local-decision-diagnostics.json`，每次覆盖。`model_reused=true` 和
-`model_load_ms=0` 表示后续推理复用了本次进程的模型，`session_request_number` 表示会话内请求序号。
-也可在调试器查看 `session.engine.last_diagnostics`。
+三个脚本均单次执行，退出时释放模型。诊断数据在 `artifacts/local-decision-diagnostics.json`，
+每次覆盖。`model_load_ms` 为加载耗时；`response_ms` 为请求进入推理引擎到得到决策的 RT，
+在 GPU 同步后计时，排除加载、输入文件读取/base64 封装、网络、排队、控制台输出。
+RT 包含媒体解码、processor 预处理、全部问题的前向与结果组装。每个问题的纯模型前向时间
+在 `questions.<id>.timing_ms.forward` 中单独记录。首次推理仍可能有后端初始化开销。
 
 ## 启动服务
 
