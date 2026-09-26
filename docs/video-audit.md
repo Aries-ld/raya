@@ -1,5 +1,7 @@
 # 视频链路检查与 10 秒样例验收
 
+> 本文为历史验证记录。文中 `local_tests/` 下的脚本、请求和媒体仅保存在开发者本地，不随公开仓库分发；接入示例见 [docs/examples](examples/)。
+
 本页是固定8帧阶段的历史记录；当前采样为fps=1，见 [fps1-validation.md](fps1-validation.md)。
 
 日期：2026-09-27；MPS FP16，torch 2.10.0、Transformers 5.17.0，Raya v1。

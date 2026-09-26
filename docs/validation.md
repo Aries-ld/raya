@@ -1,5 +1,7 @@
 # 原生决策协议验收
 
+> 本文为历史验证记录。文中 `local_tests/` 下的脚本、请求和媒体仅保存在开发者本地，不随公开仓库分发；接入示例见 [docs/examples](examples/)。
+
 当前采样已改为 **fps=1**，最新短长视频对比与性能结论见 [fps1-validation.md](fps1-validation.md)。后文8帧相关记录属于历史基线。
 
 最新视频链路检查、3–20 秒接口限制及 10 秒样例 RT 见 [video-audit.md](video-audit.md)。下方保留历史测试记录，旧 30/60 秒视频现在会被接口拒绝。

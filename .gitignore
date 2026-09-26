@@ -6,11 +6,6 @@
 /artifacts/
 /tests/fixtures/*.mp4
 /tests/fixtures/*.jpg
-/local_tests/image.jpg
-/local_tests/video.mp4
-/local_tests/*.png
-/local_tests/*.jpeg
-/local_tests/*.webp
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -19,3 +14,4 @@ __pycache__/
 .idea/
 dist/
 *.egg-info/
+/local_tests/

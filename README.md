@@ -210,16 +210,16 @@ Containers use a non-root user and a read-only model mount. Use native Python fo
 ## 本地验证 / Local verification
 
 ```bash
-uv run ruff check raya_maas scripts local_tests tests docs/examples
+uv run ruff check raya_maas scripts tests docs/examples
 uv run pytest -q
 
 # 已启动服务的真实HTTP检查 / Real HTTP checks against a running service
-uv run python scripts/smoke.py
+python3 docs/examples/call_raya.py --request docs/examples/text-request.json
 ```
 
-不启动HTTP服务时，也可以运行`local_tests/run_text.py`、`run_image.py`或`run_video.py`，在PyCharm中直接Run/Debug。编辑同目录JSON定义材料、问题和候选。媒体文件不随仓库分发，请提供自己的图片/视频并更新相对路径；默认文字示例无需媒体。
+私人本地测试目录`local_tests/`不纳入版本控制。公开调用示例位于`docs/examples/`；图片和视频请由调用方自行提供。
 
-For offline testing, run `local_tests/run_text.py`, `run_image.py`, or `run_video.py`, including through PyCharm Run/Debug. Edit the adjacent JSON files to define context, questions, and options. Media files are not distributed with the repository: provide your own files and update the relative paths. The default text example requires no media.
+The private `local_tests/` directory is excluded from version control. Public client examples are available in `docs/examples/`; callers supply their own images and videos.
 
 现有验证覆盖协议、鉴权、输入限制、采样一致性、设备降级、请求队列和计时。小样本结果不代表整体准确率或生产SLA；MPS上的20秒视频当前仍可能超过2秒。具体数据与边界见下列报告。
 
@@ -233,7 +233,6 @@ Verification covers the protocol, authentication, input limits, sampling consist
 
 ```text
 raya_maas/       # 推理与HTTP服务 / Inference and HTTP service
-local_tests/     # 可编辑JSON与独立入口 / Editable JSON requests and local runners
 scripts/         # 媒体准备、检查与基准 / Media preparation, checks, benchmarks
 tests/           # 自动化测试 / Automated tests
 docs/            # 接入规范与验证记录 / Integration guide and verification records
