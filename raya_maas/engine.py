@@ -8,9 +8,10 @@ import torch
 from transformers import AutoModelForImageTextToText, AutoProcessor, AutoTokenizer
 
 from .config import Settings
+from .decisions import SystemOneRequest, evaluate
 from .errors import APIError
 from .media import load_image, read_media, sample_video
-from .schemas import ChatRequest, render
+from .schemas import InferenceInput, render
 
 logger = logging.getLogger(__name__)
 
@@ -103,17 +104,9 @@ class DecisionEngine:
             logits = output.logits[0, -1, self.label_ids].float().cpu()
         return logits
 
-    def predict(self, request: ChatRequest) -> dict:
-        started = time.perf_counter()
-        try:
-            prompt, candidates, media = render(request)
-        except ValueError as exc:
-            raise APIError(str(exc)) from exc
+    def prepare_media(self, media):
         if len(media) > self.settings.max_media or sum(kind == "video" for kind, _ in media) > 1:
             raise APIError("Too many media inputs (at most one video)")
-        # Bound text before doing any remote download or video work.
-        if len(self.tokenizer.encode(prompt)) > self.settings.max_input_tokens:
-            raise APIError("Input exceeds token limit", 400, "context_length_exceeded")
         images, videos, metadata, video_stats = [], [], [], []
         for kind, url in media:
             data = read_media(url, kind, self.settings)
@@ -154,6 +147,24 @@ class DecisionEngine:
                     },
                 },
             )
+        return kwargs, video_stats
+
+    def predict(self, request: InferenceInput | SystemOneRequest, *, prepared_media=None) -> dict:
+        if isinstance(request, SystemOneRequest):
+            return evaluate(self, request)
+        started = time.perf_counter()
+        try:
+            prompt, candidates, media = render(request)
+        except ValueError as exc:
+            raise APIError(str(exc)) from exc
+        if len(media) > self.settings.max_media or sum(kind == "video" for kind, _ in media) > 1:
+            raise APIError("Too many media inputs (at most one video)")
+        # Bound text before doing any remote download or video work.
+        if len(self.tokenizer.encode(prompt)) > self.settings.max_input_tokens:
+            raise APIError("Input exceeds token limit", 422, "context_length_exceeded")
+        kwargs, video_stats = (
+            self.prepare_media(media) if prepared_media is None else prepared_media
+        )
         try:
             inputs = (
                 self.processor(text=[prompt], return_tensors="pt", **kwargs)
@@ -165,7 +176,7 @@ class DecisionEngine:
         token_count = inputs["input_ids"].shape[-1]
         if token_count > self.settings.max_input_tokens:
             raise APIError(
-                "Input exceeds token limit after vision expansion", 400, "context_length_exceeded"
+                "Input exceeds token limit after vision expansion", 422, "context_length_exceeded"
             )
         prepared = time.perf_counter()
         while True:
@@ -208,8 +219,6 @@ class DecisionEngine:
             "confidence": probabilities[winner],
             "probabilities": dict(zip(labels, probabilities)),
             "candidates": dict(zip(labels, candidates)),
-            "needs_review": probabilities[winner] < request.confidence_threshold,
-            "threshold": request.confidence_threshold,
             "prompt_tokens": token_count,
             "device": self.device,
             "timing_ms": {

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "raya-maas"
 version = "0.1.0"
-description = "Single-forward multimodal decision serving with an OpenAI-compatible API"
+description = "Multimodal decision MaaS with a Jev-shaped System One protocol"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.135,<0.142", "uvicorn[standard]>=0.41,<0.55",
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.15,<0.17", "openai>=2,<4"]
+dev = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.15,<0.17"]
 
 [project.scripts]
 raya-serve = "raya_maas.cli:serve"

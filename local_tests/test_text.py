@@ -1,4 +1,4 @@
-"""右键 Run / Debug 即可。直接编辑同目录 text.txt；素材也在本目录。"""
+"""直接编辑 text.json 的 state / questions，右键 Run 或 Debug。"""
 
 import sys
 from pathlib import Path
@@ -6,12 +6,13 @@ from pathlib import Path
 DIRECTORY = Path(__file__).resolve().parent
 sys.path.insert(0, str(DIRECTORY.parent))
 
-from raya_maas.local_test import run_case_file  # noqa: E402
+from raya_maas.local_test import load_request_file, run_local_decision  # noqa: E402
 
 
 def main():
-    result = run_case_file("text", DIRECTORY)
-    return result  # 在此打断点，查看标签、选项、概率、置信度及耗时。
+    request = load_request_file(DIRECTORY / "text.json")  # 完整决策请求，可在此查看/修改。
+    result = run_local_decision(request, DIRECTORY.parent)
+    return result  # 响应只有 model / answers / usage，与 HTTP 接口相同。
 
 
 if __name__ == "__main__":

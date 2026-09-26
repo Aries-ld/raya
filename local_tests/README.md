@@ -1,25 +1,27 @@
-# 直接编辑、右键运行
+# 三种模态，同一个决策协议
 
-本目录包含三个独立的 Python 测试入口和已经准备好的默认输入。无需启动服务、配置启动参数或修改脚本变量。
+**编辑 JSON 完整请求，再右键 Run / Debug。每次都显式提供材料、问题和候选。**
 
-| 右键 Run / Debug 的文件 | 直接修改的问题与候选 | 可直接替换的素材 |
+| 运行入口 | 编辑请求 | 默认媒体 |
 | --- | --- | --- |
-| `test_text.py` | `text.txt` | 文本已在 `text.txt` 中 |
-| `test_image.py` | `image.txt` | `image.jpg` |
-| `test_video.py` | `video.txt` | `video.mp4`，m3bench 的 30 秒片段 |
+| `test_text.py` | `text.json` | state 中的文字 |
+| `test_image.py` | `image.json` | `image.jpg` |
+| `test_video.py` | `video.json` | `video.mp4`，30 秒 m3bench 片段 |
 
-PyCharm 解释器选项目根目录下 `.venv/bin/python`，打开相应 `.py`，右键 Run / Debug 即可。
-在脚本的 `return result` 打断点可查看完整结果；Step Into 可进入加载、预处理和模型前向。
-脚本固定读取同目录下的文件，不受 IDE 工作目录影响。
+JSON 分成三个部分：
 
-修改 `.txt` 时，前面写上下文和问题，末尾每行写一个候选，使用连续的 `A. `、`B. `、`C. ` 等标签（至少两项）。
-替换图片或视频时保持文件名不变，再运行对应脚本。图片如换成其他格式，可以先另存为 JPEG。
-视频只分析画面，不识别音轨；默认固定采样 8 帧，所以短暂发生的动作可能漏采。
+- `model`：`raya-decision-v1`。
+- `state`：待判断的文字或 `{"text":"背景", "media":[...]}`。
+- `questions`：自己给问题命名；每个问题有 `type`、`instructions`，choice/score 还必须有 `criteria`。
 
-默认视频取自已有 m3bench `bedroom_01` 派生片段 `clip002.mp4` 的前 30 秒，
-与此前自测的 kitchen/living 片段不同。已转为 H.264 MP4、30fps、900 帧、30.000 秒，去除音轨。
-来源、转换参数和 SHA256 记录在 `provenance.json`。训练数据清单不在本机，无法确认该视频是否
-参与过 Raya 训练；它可用于自定义测试，但不能据此称为严格的未见数据泛化评测。
+比如图片里的 `held_object` 问题明确问“右侧人物手里拿着什么？”，候选是 `basketball / laptop / cup / book`，描述分别是篮球、笔记本电脑、水杯和书。修改问题时要同步修改候选。输出 `answers.held_object.choice` 直接是你的选项 ID，不是 A/B/C。
 
-图片和视频已在本机准备好，但不提交到 Git。换机器需要拷贝这两个文件；若原 bench 仍在，
-也可按 `provenance.json` 的路径和转换参数重建。原有自动化 HTTP 测试素材仍保留在 `tests/fixtures/`。
+`choice` 从选项中选一个；`score` 从有序等级的概率计算分数；`noul` 内部固定是/否选项，返回“是”的概率。`text.json` 演示一份 state 同时问三种问题。
+
+PyCharm 解释器选择项目 `.venv/bin/python`，无需参数、API key 或 HTTP 服务。`request` 变量是已经校验的正式请求；`result` 只有 `model / answers / usage`，与 HTTP 输出相同。可在这两行打断点。诊断耗时在 `artifacts/local-decision-diagnostics.json`。
+
+文件中的 `file:./image.jpg` / `file:./video.mp4` 是本地测试加载器的便利语法，运行时转换成 data URL；HTTP 服务不支持 file URL。可以直接替换同名媒体，也可直接修改 JSON 中的相对文件路径，路径相对于 JSON 所在目录。
+
+默认视频：m3bench `bedroom_01` 派生 `clip002.mp4` 前 30 秒，H.264、30fps、900 帧、无音轨。视频问题问“红色纸盒里是什么食物”，并提供四个明确候选。模型仍固定采样 8 帧。是否参与过训练未知，不能把这条样例当作严格的未见数据评测。
+
+媒体已准备在本机，不进 Git；来源、转换参数、SHA256 在 `provenance.json`。完整协议及差异见 [docs/api.md](../docs/api.md)。

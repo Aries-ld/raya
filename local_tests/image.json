@@ -1,0 +1,19 @@
+{
+  "model": "raya-decision-v1",
+  "state": {
+    "text": "观察这张图片。",
+    "media": [{"type": "image", "url": "file:./image.jpg"}]
+  },
+  "questions": {
+    "held_object": {
+      "type": "choice",
+      "instructions": "右侧人物手里拿着什么？",
+      "criteria": {
+        "basketball": "篮球",
+        "laptop": "笔记本电脑",
+        "cup": "水杯",
+        "book": "书"
+      }
+    }
+  }
+}

@@ -1,71 +1,63 @@
-# 验收记录
+# 原生决策协议验收
 
-日期：2026-09-27。环境：Apple Silicon arm64，24GiB 统一内存，Python 3.12；torch 2.10.0、Transformers 5.17.0。模型与 processor commit 见 `models/manifest.json`。本记录区分协议/工程测试、真实模型冒烟测试和性能对比；不是模型准确率或校准评测。
+日期：2026-09-27。Apple Silicon arm64，24GiB 内存，Python 3.12、torch 2.10.0、Transformers 5.17.0。模型与 processor revision 固定在 `raya_maas/download.py`，本地下载记录在 `models/manifest.json`。
 
-## 自动测试
+本记录验证 Raya 实现的决策协议与真实模型调用，不是 Jev 性能对比或 Raya 训练校准复测。
 
-`uv run pytest -q`：32 项通过。
+## 协议和自动测试
 
-覆盖：OpenAI Python SDK、模型列表、JSON 和 SSE/usage、鉴权、请求大小和参数限制、候选模板、候选 logits 局部 softmax、单次无梯度前向、CUDA→MPS→CPU 设备顺序及后端异常回退、队满 429、超时不释放仍运行的 worker、取消排队任务、媒体限制和非法来源、视频采样一致性。
+正式接口为 `POST /v1/systemone`，请求顶层仅 `model / state / questions`，成功响应仅 `model / answers / usage`。图片、视频在 `state.media` 中显式提供，问题在 `questions.*.instructions`，选择项在 `criteria`。
 
-`ruff check`、`ruff format --check`、`git diff --check`、依赖锁检查均通过。测试中的模型桩不冒充真实模型；以下结果另外通过实际加载权重取得。
+41 项自动测试通过。覆盖：
 
-## 真实模型
+- choice 原选项 ID 映射、score 概率加权计算、noul 是的概率，以及混合问题响应。
+- 缺少 state/questions/instructions/criteria、非法问题类型、候选/等级/问题数量越界的 422。
+- 图片不能替代问题；不同问题 ID 不改变模型输入；结构化 state/instructions/criteria。
+- 单次前向、末位 logits、候选掩码 softmax、CUDA→MPS→CPU 顺序及故障回退。
+- 鉴权、请求体限制、未知路由/模型、队满、超时后 worker 仍独占模型、丢弃失效排队任务。
+- 媒体来源/大小/时长/像素限制、稀疏和顺序解码采样帧逐像素一致。
+- OpenAPI 请求/响应字段和路由；旧聊天端点不存在。
 
-`scripts/smoke.py` 通过 TCP HTTP 服务与官方 OpenAI SDK 实测。MPS FP16，单次样例耗时，包含首次视觉形状编译/初始化的影响，不是稳态压测数据。
+测试使用模型桩验证协议/调度；真实模型结果另外记录。Starlette TestClient 对 httpx 存在一条上游弃用提示，不影响当前测试通过。
 
-| 样例 | 结果 | 置信度 | 模型前向 | HTTP 总耗时 |
-| --- | --- | --- | --- | --- |
-| 中文会议改期（mock 文本） | 修改会议时间 | 0.99451 | 439.5ms | 486.6ms |
-| 英文取消预约（mock 文本） | Cancel a reservation | 0.99936 | 274.2ms | 276.8ms |
-| m3bench 图片：右侧人物手持物品 | A basketball | 0.99988 | 3878.8ms | 3921.0ms |
-| m3bench kitchen，60 秒 | A kitchen | 0.99019 | 1773.3ms | 2183.1ms |
-| m3bench living，约 12 秒 | An indoor room | 0.99930 | 1134.9ms | 1485.2ms |
+## 真实模型本地测试
 
-文本和图片案例另有人工设定预期，均相符；视频案例仅用于验证真实解码、输入、决策和概率结构，不作为带标注准确率统计。所有分布概率和约为 1，选项均在候选集内。另通过标准内联选项 + `json_object` + SSE 流式组合调用。
+通过直接运行 `local_tests/test_text.py`、`test_image.py`、`test_video.py`，不启动客户端 HTTP 请求、不传启动参数，并将工作目录设为 `/tmp`，确认与 IDE 工作目录无关。读取同目录完整 JSON 请求，加载真实模型到 MPS FP16：
 
-CPU FP32 单独加载真实权重，英文取消预约结果同为 B，置信度 0.99936，前向约 3269.3ms。CUDA 不可用，未做 CUDA 实机测试；自动降级路径由故障注入测试验证，本机正常路径直接选择 MPS。
+| 输入 | 问题 | 输出 | 概率/置信度 |
+| --- | --- | --- | --- |
+| 找回密码文字 | intent / choice | reset_password | 0.999118 |
+| 同一文字 | needs_account_help / noul | 是的概率 | 0.983940 |
+| 同一文字 | urgency / score | 0.166383，等级范围 0–2 | 最大等级概率 0.909444 |
+| m3bench 图片 | held_object / choice | basketball | 0.999689 |
+| m3bench 30 秒视频 | food_in_box / choice | fries | 0.981071 |
 
-原始输出：`artifacts/smoke.json`、`artifacts/cpu-smoke.json`。这些文件为本地产物，不入版本控制。
+choice 结果与人工预期相符；概率和约为 1。noul/score 用来验证计算与输出类型，不把几条样例当作专项校准结果。文本三问、图片一问、视频一问，单次本地推理总耗时分别约 1759ms、960ms、2714ms；不含模型加载，存在首次初始化影响，非稳态基准。
 
-最终鉴权实例监听 `0.0.0.0:8000`，本机 `/readyz` 为 200，无密钥访问 `/v1/models` 为 401，正确密钥访问为 200；携带密钥的真实模型请求返回正确选项 B，设备为 MPS。密钥仅存于权限 0600 的 `.env`，鉴权复测输出在 `artifacts/authenticated-smoke.json`。本地运行实例的 PID 和日志分别在 `artifacts/server.pid` 与 `artifacts/server.log`。
+原始响应：`artifacts/systemone-local-{text,image,video}.json`。诊断：同名前缀加 `-diagnostics.json`，记录设备、每问 token/时间及媒体解码时间。公开响应不包含额外调试字段。
 
-## 无服务的三个独立脚本
+新视频由 m3bench `bedroom_01` 派生 `clip002.mp4` 裁剪转码，ffprobe 实测 **30.000 秒、30fps、900 帧**，模型采样 8 帧。图片、视频来源及校验和在 `local_tests/provenance.json`。训练重叠未知。
 
-`scripts/test_text.py`、`scripts/test_image.py`、`scripts/test_video.py` 均直接加载本地模型，
-无需 HTTP 服务或 API key。分别使用命令行覆盖问题/候选、图片路径、视频路径后完成真实 MPS 测试：
+## 真实 HTTP 服务
 
-- 文本：`请取消明天的会议。这是什么意图？`，候选为修改/创建/取消会议，返回 C「取消会议」。
-- 图片：使用 `m3bench_living.jpg`，返回 A「A basketball」。
-- 视频：使用 `m3bench_kitchen.mp4`，返回 A「A kitchen」，固定采样 8 帧。
+服务已切换到原生协议，通过 `scripts/smoke.py` 读取相同的三份 JSON、展开本地媒体为 data URL，
+携带实际 Bearer key 调用 `/v1/systemone`。文本三种问题和图片/视频 choice 均通过，响应结构
+与本地一致。缺少 questions 返回 422，旧聊天路径返回 404。原始输出在
+`artifacts/systemone-http.json`。`/readyz` 探针正常，服务仍监听 `0.0.0.0:8000`。
 
-三个样例均检查预期标签和概率归一化；输出位于 `artifacts/local-text.json`、
-`artifacts/local-image.json`、`artifacts/local-video.json`。另检查三个脚本的 `--help`，
-以及不存在的图片路径会在加载模型前报告输入错误。新增脚本后原有 32 项自动测试、格式检查仍通过。
+## 视频解码对比
 
-后续将三个入口统一迁移至 `local_tests/`，默认读取同目录的 `text.txt`、`image.txt`、
-`video.txt` 和 `image.jpg`、`video.mp4`，不再要求编辑脚本变量。
-新视频来自 m3bench `bedroom_01` 派生片段 `clip002.mp4`，裁剪并转码后 ffprobe
-验证时长为 30.000 秒、30fps、900 帧。使用 `/tmp` 作为工作目录，无启动参数运行三个脚本，
-真实 MPS 推理分别返回「重置登录密码」「篮球」「薯条」，均匹配人工检查的默认预期。
-结果在 `artifacts/default-files-{text,image,video}.json`。原有 32 项自动测试仍通过。
-新视频仅可确认不同于此前的 kitchen/living 自测素材，训练数据重叠情况未知。
-
-## 视频解码优化
-
-`scripts/benchmark_video.py`，相同数据、相同 8 个采样时间点、相同 FFmpeg 缩放和 RGB 格式，分别运行 3 次，取中位数。计时仅包含视频解码/采样/缩放，不含读磁盘、HTTP 上传或模型前向。
+此前使用同样的解码模块执行 `scripts/benchmark_video.py`，每种方式 3 次取中位数：
 
 | 文件 | 顺序解码 | seek 解码 | 加速 | 实际解码帧数 |
 | --- | --- | --- | --- | --- |
 | kitchen，60 秒 | 2472.811ms | 303.977ms | 8.14× | 1800 → 204 |
 | living，约 12 秒 | 783.431ms | 288.441ms | 2.72× | 362 → 108 |
 
-两种方法返回的 8 帧时间索引与 RGB 像素逐项完全一致，已用数组断言检查。基线也是只保留 8 帧的有界顺序实现，并非将整个视频展开成 RGB 后再采样的高内存实现。长 GOP、不同编码、磁盘/网络、分辨率会影响收益。
+时间点与选中 RGB 帧逐像素一致。这里是纯 CPU 解码，不是原生多问题协议吞吐或 CUDA 性能。新 30 秒视频编码/GOP 不同，本次解码约 1257ms，不沿用 8.14× 的收益。
 
-原始记录：`artifacts/video-benchmark.json`。bench 来源、裁剪方式和文件 SHA256：`tests/fixtures/provenance.json`。
+## 尚未验证的范围
 
-## 部署边界
+当前无 CUDA、无 Docker，CUDA 实机性能和容器构建未验证。此前 CPU FP32 的基础候选推理验证通过，但本轮原生协议的多模态真实测试在 MPS 上完成。NVDEC/GPU 解码、共享前缀并行问题、动态批处理未实现。
 
-已提供 Dockerfile、CPU Compose 与 NVIDIA GPU override、非 root 运行、只读模型挂载、就绪探针。当前机器未安装 Docker，无 CUDA，容器构建和 GPU 吞吐未验证。公网域名、TLS、网关配额和服务器发布不在本次 MaaS 工程交付的实测范围内。
-
-工程采用单模型 worker、有界队列，不提供动态批处理。视频解码使用 CPU PyAV/FFmpeg；没有宣称已完成 NVDEC/GPU 解码。手册给出的服务器毫秒级延迟与 ECE 结果未在此环境重新验证。
+choice/score confidence 使用最大概率，Jev 官方未公开精确计算式，不能声称两者数值相同。Raya 上限 26 个候选、默认每问 4096 token，也不是 Jev 全部容量/性能指标的复现。公网域名、TLS 和网关配额不属于本次本地验收。

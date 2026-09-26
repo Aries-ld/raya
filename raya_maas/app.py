@@ -1,18 +1,16 @@
 import asyncio
 import hmac
-import json
-import time
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from .config import Settings
-from .errors import APIError
-from .schemas import ChatRequest, render
+from .decisions import SystemOneRequest, SystemOneResponse
+from .errors import APIError, ErrorResponse
 from .worker import InferenceWorker
 
 
@@ -105,7 +103,7 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
     async def validation_error(request, exc):
         # Validation's input field can contain entire base64 payloads; never reflect it.
         problems = [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()]
-        return JSONResponse(APIError("; ".join(problems)).body(), 400)
+        return JSONResponse(APIError("; ".join(problems)).body(), 422)
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
@@ -121,87 +119,36 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
             {"status": "ready" if app.state.ready else "loading"}, 200 if app.state.ready else 503
         )
 
-    def model_card():
-        return {"id": settings.model_name, "object": "model", "created": 0, "owned_by": "raya"}
-
     @app.get("/v1/models")
     async def models():
-        return {"object": "list", "data": [model_card()]}
+        return {
+            "models": [
+                {
+                    "id": settings.model_name,
+                    "question_types": ["choice", "score", "noul"],
+                    "modalities": ["text", "text+image", "text+video"],
+                    "limits": {
+                        "choice_options": 26,
+                        "score_levels": 10,
+                        "questions": 16,
+                        "input_tokens_per_question": settings.max_input_tokens,
+                    },
+                }
+            ]
+        }
 
-    @app.get("/v1/models/{model_id}")
-    async def model(model_id: str):
-        if model_id != settings.model_name:
-            raise APIError("Model not found", 404, "model_not_found")
-        return model_card()
-
-    @app.post("/v1/chat/completions")
-    async def completions(body: ChatRequest, request: Request):
+    @app.post(
+        "/v1/systemone",
+        response_model=SystemOneResponse,
+        responses={
+            status: {"model": ErrorResponse} for status in (401, 404, 413, 422, 429, 500, 503, 504)
+        },
+    )
+    async def systemone(body: SystemOneRequest):
         if body.model != settings.model_name:
             raise APIError("Model not found", 404, "model_not_found")
-        try:
-            render(body)
-        except ValueError as exc:
-            raise APIError(str(exc)) from exc
         if not app.state.ready:
             raise APIError("Model not ready", 503, "service_unavailable")
-        result = await app.state.worker.submit(body)
-        prompt_tokens = result.pop("prompt_tokens")
-        content = (
-            json.dumps(result, ensure_ascii=False)
-            if body.response_format.type == "json_object"
-            else result["label"]
-        )
-        usage = {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": 0,
-            "total_tokens": prompt_tokens,
-        }
-        common = {
-            "id": "chatcmpl-" + uuid.uuid4().hex,
-            "created": int(time.time()),
-            "model": settings.model_name,
-        }
-        if not body.stream:
-            return {
-                **common,
-                "object": "chat.completion",
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": content, "refusal": None},
-                        "finish_reason": "stop",
-                        "logprobs": None,
-                    }
-                ],
-                "usage": usage,
-                "decision": result,
-            }
-
-        async def chunks():
-            common["object"] = "chat.completion.chunk"
-            for delta, finish, extra in [
-                ({"role": "assistant", "content": ""}, None, {}),
-                ({"content": content}, None, {}),
-                ({}, "stop", {"decision": result}),
-            ]:
-                chunk = {
-                    **common,
-                    "choices": [
-                        {"index": 0, "delta": delta, "finish_reason": finish, "logprobs": None}
-                    ],
-                    **extra,
-                }
-                if body.stream_options and body.stream_options.include_usage:
-                    chunk["usage"] = None
-                yield "data: " + json.dumps(chunk, ensure_ascii=False) + "\n\n"
-            if body.stream_options and body.stream_options.include_usage:
-                yield "data: " + json.dumps({**common, "choices": [], "usage": usage}) + "\n\n"
-            yield "data: [DONE]\n\n"
-
-        return StreamingResponse(
-            chunks(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-        )
+        return await app.state.worker.submit(body)
 
     return app

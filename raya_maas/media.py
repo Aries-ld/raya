@@ -65,7 +65,7 @@ def read_media(url: str, kind: str, settings: Settings) -> bytes:
                         if len(data) + len(chunk) > settings.max_media_bytes:
                             raise APIError("Media exceeds byte limit", 413, "payload_too_large")
                         if time.monotonic() - start > settings.media_timeout:
-                            raise APIError("Media download timed out", 400, "media_timeout")
+                            raise APIError("Media download timed out", 422, "media_timeout")
                         data.extend(chunk)
                     data = bytes(data)
         except (httpx.HTTPError, OSError) as exc:
@@ -166,7 +166,7 @@ def _sample(data: bytes, settings: Settings, strategy: str, started: float) -> V
             if decoded > settings.max_video_decode_frames:
                 raise APIError("Video exceeded decode frame budget")
             if time.monotonic() - started > settings.media_timeout:
-                raise APIError("Video decode timed out", 400, "media_timeout")
+                raise APIError("Video decode timed out", 422, "media_timeout")
 
         def save(frame, timestamp):
             frames.append(frame.reformat(width=width, height=height, format="rgb24").to_ndarray())

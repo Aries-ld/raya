@@ -5,7 +5,7 @@ from transformers import BatchEncoding
 
 from raya_maas.config import Settings
 from raya_maas.engine import DecisionEngine, available_devices
-from raya_maas.schemas import ChatRequest
+from raya_maas.schemas import InferenceInput
 
 
 def test_device_priority(monkeypatch):
@@ -28,12 +28,7 @@ class Tokenizer:
 
 
 def request():
-    return ChatRequest(
-        model="raya-decision-v1",
-        messages=[{"role": "user", "content": "Q?"}],
-        candidates=["yes", "no"],
-        confidence_threshold=0.8,
-    )
+    return InferenceInput(text="Q?", candidates=["yes", "no"])
 
 
 def test_one_forward_last_position_and_candidate_mask():
@@ -57,7 +52,6 @@ def test_one_forward_last_position_and_candidate_mask():
     assert engine.model.calls == 1
     assert result["label"] == "B"
     assert abs(result["confidence"] - 0.7310586) < 1e-6
-    assert result["needs_review"]
 
 
 def test_runtime_fallback_retries_backend_but_does_not_generate(monkeypatch):

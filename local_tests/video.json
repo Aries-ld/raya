@@ -1,0 +1,19 @@
+{
+  "model": "raya-decision-v1",
+  "state": {
+    "text": "观察这段 30 秒视频中的红色纸盒。",
+    "media": [{"type": "video", "url": "file:./video.mp4"}]
+  },
+  "questions": {
+    "food_in_box": {
+      "type": "choice",
+      "instructions": "视频中，红色纸盒里装着什么食物？",
+      "criteria": {
+        "fries": "薯条",
+        "dumplings": "饺子",
+        "sushi": "寿司",
+        "noodle_soup": "汤面"
+      }
+    }
+  }
+}
