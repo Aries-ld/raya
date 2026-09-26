@@ -176,6 +176,11 @@ uv run python scripts/test_video.py \
 ```
 
 也可以直接编辑每个脚本顶部的 `QUESTION`、`CANDIDATES`、`IMAGE_PATH` / `VIDEO_PATH`。
+PyCharm 中将项目解释器选为本项目 `.venv/bin/python`，打开任一脚本，直接右键 Run 或 Debug，
+无需填写命令行参数。可在 `main()` 的 `run_local_test(...)` 或 `return result` 行打断点，
+也可进入 `raya_maas/local_test.py` 的 `engine.load()`、`engine.predict(request)` 调试。
+脚本自动定位项目源码、`.env` 和模型目录，不依赖 IDE 的 Working directory；相对媒体路径和
+`--output` 路径均相对于项目根目录。`DEVICE` 和 `THRESHOLD` 也可在脚本顶部修改。
 候选必须随问题一起调整，模型只能从候选中选择。输出包括所选标签/文本、各项概率、置信度、
 实际设备、token 数、推理耗时；视频另有采样帧数、实际解码帧数和解码耗时。
 

@@ -40,15 +40,23 @@ def build_request(args, settings: Settings, modality: str) -> ChatRequest:
 
 
 def run_local_test(
-    modality: str, question: str, candidates: list[str], media_path: Path | None = None
-):
+    modality: str,
+    question: str,
+    candidates: list[str],
+    media_path: Path | None = None,
+    *,
+    project_root: Path | None = None,
+    device: str | None = None,
+    threshold: float = 0.6,
+) -> dict:
+    root = (project_root or Path.cwd()).resolve()
     parser = argparse.ArgumentParser(description=f"Raya 本地{modality}决策测试，无需启动服务")
     parser.add_argument("--question", default=question, help="问题或文本上下文")
     parser.add_argument("--candidates", nargs="+", default=candidates, help="2–26 个候选，逐个传入")
     if modality != "text":
         parser.add_argument(f"--{modality}", type=Path, default=media_path, help="本地媒体路径")
-    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default=None)
-    parser.add_argument("--threshold", type=float, default=0.6, help="低置信度门控阈值")
+    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default=device)
+    parser.add_argument("--threshold", type=float, default=threshold, help="低置信度门控阈值")
     parser.add_argument("--max-input-tokens", type=int, default=None, help="覆盖输入 token 上限")
     if modality == "video":
         parser.add_argument(
@@ -62,7 +70,13 @@ def run_local_test(
         if getattr(args, name, None) is not None
     }
     try:
-        settings = Settings(**overrides)
+        settings = Settings(_env_file=root / ".env", **overrides)
+        for name in ("model_path", "processor_path"):
+            path = Path(getattr(settings, name)).expanduser()
+            setattr(settings, name, str(path if path.is_absolute() else root / path))
+        if modality != "text":
+            path = Path(getattr(args, modality)).expanduser()
+            setattr(args, modality, path if path.is_absolute() else root / path)
         request = build_request(args, settings, modality)
     except (OSError, ValueError, ValidationError) as exc:
         parser.exit(2, f"输入错误：{exc}\n")
@@ -85,5 +99,8 @@ def run_local_test(
     output = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     print(output, end="")
     if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(output, encoding="utf-8")
+        path = args.output.expanduser()
+        path = path if path.is_absolute() else root / path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(output, encoding="utf-8")
+    return result
