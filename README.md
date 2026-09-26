@@ -1,75 +1,124 @@
-# Raya 决策 MaaS
+# Raya · Multimodal Decision MaaS
 
-Raya v1 是基于 Qwen3.5-2B 的多模态候选决策模型。服务采用 **Jev System One 风格的决策协议**：调用方显式提供待判断材料、问题和候选/等级，返回类型确定的答案与概率。每个问题只做一次前向，不进行自回归生成。
+**多模态候选决策服务：输入材料与问题，返回可执行的结构化判断。**<br>
+**A multimodal decision service: provide context and typed questions, receive structured answers.**
 
-正式接口：`POST /v1/systemone`。请求顶层为 `model / state / questions`，响应顶层为 `model / answers / usage`。本工程不再提供聊天接口或聊天 SDK 兼容层。训练代码、数据集已移除，只保留下载、推理、服务和自测。
+[模型 / Model](https://huggingface.co/yuyu199741/raya-decision-v1) · [基座 / Base model](https://huggingface.co/Qwen/Qwen3.5-2B) · [接口文档 / API guide](docs/api.md) · [OpenAPI](docs/openapi.json) · [调用示例 / Client examples](docs/examples/)
 
-## 先直接测试，不启动服务
+Raya 基于 Qwen3.5-2B 后训练权重，为文字、图片和短视频提供候选选择、等级评分与是/否概率判断。每个问题执行一次模型前向，通过候选标签的分数计算概率，并由服务代码组装 JSON；不进行自回归文本生成。
 
-PyCharm 解释器选本项目 `.venv/bin/python`。在 `local_tests/` 中编辑 JSON，再对相应脚本右键 Run / Debug。无需启动参数或 API key。
+Raya serves a post-trained Qwen3.5-2B checkpoint for candidate selection, ordinal scoring, and yes/no probability judgments over text, images, and short videos. Each question uses one model forward pass. Candidate-label scores determine the probabilities; application code assembles the JSON response without autoregressive text generation.
 
-| 运行脚本 | 编辑的完整请求 | 默认媒体 |
-| --- | --- | --- |
-| `local_tests/run_text.py` | `local_tests/text.json` | 文字在 `state` 中；示例含 choice/noul/score 三个问题 |
-| `local_tests/run_image.py` | `local_tests/image.json` | `local_tests/image.jpg` |
-| `local_tests/run_video.py` | `local_tests/video.json` | `local_tests/video.mp4`，m3bench 的 10 秒片段 |
+本仓库聚焦模型下载、推理服务、协议校验和验证工具。训练代码、模型权重、原始测试媒体与密钥不随当前代码分发。
 
-每份 JSON 中都能直接看到 `state`、`questions.*.instructions` 和 `criteria`。替换媒体可保持文件名不变；换问题就同时调整判断标准。在 `request = load_request_file(...)` 和 `return result` 打断点可分别检查完整请求与响应。
+This repository focuses on model acquisition, inference serving, request validation, and verification tools. Training code, model weights, raw test media, and credentials are not distributed with the current source tree.
 
-本地 JSON 用 `file:./image.jpg` / `file:./video.mp4` 引用文件，测试脚本先转为 base64 data URL，再交给与 HTTP 相同的 `SystemOneRequest` 和推理路径。**HTTP 接口禁止读取服务端本地文件**。相对路径相对于 JSON 所在目录，模型和 `.env` 相对于项目根目录，不依赖 IDE 工作目录。
+## 模型信息 / Model artifacts
 
-```bash
-uv run python local_tests/run_text.py
-uv run python local_tests/run_image.py
-uv run python local_tests/run_video.py
+| 项目 / Item | 来源 / Source |
+| --- | --- |
+| Raya v1 权重 / Decision checkpoint | [yuyu199741/raya-decision-v1](https://huggingface.co/yuyu199741/raya-decision-v1) |
+| 后训练基座 / Base model | [Qwen/Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B) |
+| 分词器 / Tokenizer | 来自 Raya checkpoint / Loaded from the Raya checkpoint |
+| 视觉预处理器 / Vision processor | 来自 Qwen3.5-2B / Loaded from Qwen3.5-2B |
+| 版本锁定 / Revision pinning | 下载模块固定仓库 commit / Repository commits pinned in [download.py](raya_maas/download.py) |
+
+首次下载的模型权重约4.4GB。下载清单写入 `models/manifest.json`；运行服务时只读取本地文件。
+
+The initial model weights download is approximately 4.4GB. Downloaded revisions are recorded in `models/manifest.json`; serving uses local files only.
+
+## 能力与协议 / Capabilities and contract
+
+| 能力 / Capability | 行为 / Behavior |
+| --- | --- |
+| 文字 / Text | 自然语言或结构化 JSON 材料 / Natural-language or structured JSON context |
+| 图片 / Images | 文字上下文与图片共同判断 / Decisions over text context and image inputs |
+| 视频 / Video | 3–20秒，Qwen `fps=1` 采样，仅处理画面 / 3–20 seconds, Qwen `fps=1` sampling, visual content only |
+| `choice` | 从2–26个选项中选择，返回完整概率分布 / Select from 2–26 options with a full probability distribution |
+| `score` | 对2–10个有序等级计算期望分数 / Return an expected score over 2–10 ordered levels |
+| `noul` | 返回“是”的概率 / Return the probability of yes |
+| 多问题 / Multiple questions | 一次请求1–16个独立问题 / 1–16 independent questions per request |
+| 运行设备 / Devices | 自动按 CUDA → MPS → CPU 选择与故障降级 / Automatic CUDA → MPS → CPU selection and backend fallback |
+
+正式接口为 **`POST /v1/systemone`**：
+
+```text
+model + state + questions  →  model + answers + usage
 ```
 
-三个脚本均单次执行，退出时释放模型。诊断数据在 `artifacts/local-decision-diagnostics.json`，
-每次覆盖。`model_load_ms` 为加载耗时；`response_ms` 为请求进入推理引擎到得到决策的 RT，
-在 GPU 同步后计时，排除加载、输入文件读取/base64 封装、网络、排队、控制台输出。
-RT 包含媒体解码、processor 预处理、全部问题的前向与结果组装。每个问题的纯模型前向时间
-在 `questions.<id>.timing_ms.forward` 中单独记录。首次推理仍可能有后端初始化开销。
+协议采用 Jev System One 风格；图片与视频通过 `state.media` 扩展。Raya 使用自己的模型、候选概率定义和执行实现，不声称复现 Jev 的全部能力、校准结果或吞吐。当前不提供聊天 completion、流式文本生成或工具调用。
 
-## 启动服务
+The API follows the Jev System One request/response style, with images and videos added through `state.media`. Raya uses its own checkpoint, confidence definition, and execution implementation; it does not claim to reproduce Jev's full capabilities, calibration, or throughput. Chat completions, streaming text generation, and tool calling are not provided.
 
-Python 3.12/3.13；首次权重下载约 4.4GB。已准备好本地环境时直接 `uv run raya-serve`。
+## 快速启动 / Quick start
+
+需要 Python 3.12或3.13，以及 [uv](https://docs.astral.sh/uv/)。CUDA、Apple Silicon MPS 和 CPU 使用同一份代码。
+
+Requires Python 3.12 or 3.13 and [uv](https://docs.astral.sh/uv/). The same codebase supports CUDA, Apple Silicon MPS, and CPU.
 
 ```bash
+git clone https://github.com/Aries-ld/raya.git
+cd raya
+
 uv sync --frozen --extra dev
 uv run raya-download
-# 新环境才执行复制，已有 .env 请保留
+
 cp .env.example .env
-# 将 RAYA_API_KEYS 改为随机密钥
+# 编辑 .env，将 RAYA_API_KEYS 替换为自己的随机密钥。
+# Edit .env and replace RAYA_API_KEYS with your own random secret.
+
 uv run raya-serve
 ```
 
-模型为 `yuyu199741/raya-decision-v1`。视觉 processor 来自 Qwen3.5-2B，分词器来自 Raya；两者 commit 固定在下载模块，下载清单在 `models/manifest.json`。启动后仅使用本地模型。
+已有 `.env` 时不要覆盖。客户端与服务端必须使用匹配的密钥；密钥、权重和本地产物均应留在 Git 之外。监听地址与端口通过 `RAYA_HOST` / `RAYA_PORT` 配置。
 
-设备自动按 CUDA → MPS → CPU 选择，并在后端不支持、OOM、非有限数值时降级；显式设置 `RAYA_DEVICE` 时只使用指定设备。默认精度 CUDA BF16（不支持则 FP16）、MPS FP16、CPU FP32。
+Do not overwrite an existing `.env`. Clients must use a key accepted by the server. Keep keys, weights, and local artifacts out of Git. Configure the bind address and port with `RAYA_HOST` and `RAYA_PORT`.
 
-## 决策协议
+服务启动后检查就绪状态：<br>
+Check readiness after startup:
 
-请求中的材料和问题分开，业务代码自行命名问题 ID 与选项 ID：
-
-```json
-{
-  "model": "raya-decision-v1",
-  "state": {"message": "我忘记了登录密码，无法登录账号。"},
-  "questions": {
-    "intent": {
-      "type": "choice",
-      "instructions": "用户请求的主要意图是什么？",
-      "criteria": {
-        "reset_password": "重置登录密码",
-        "register": "注册新账号",
-        "close_account": "注销账号"
-      }
-    }
-  }
-}
+```bash
+curl http://127.0.0.1:8000/readyz
+# {"status":"ready"}
 ```
 
-下面是**示意响应**，数值不是对上例的实测承诺：
+模型初始化完成前，就绪探针可能返回503或尚无法连接。对外使用时由部署方提供可访问的服务地址与API key；`127.0.0.1`只指向调用方本机。
+
+Before initialization completes, readiness checks may return 503 or fail to connect. For remote use, the operator must provide a reachable service URL and API key; `127.0.0.1` always refers to the caller's own machine.
+
+## 调用示例 / API example
+
+设置调用方环境变量。`RAYA_BASE_URL`是服务根地址，不包含`/v1`。
+
+Set client environment variables. `RAYA_BASE_URL` is the service root URL, without `/v1`.
+
+```bash
+export RAYA_BASE_URL='http://127.0.0.1:8000'
+export RAYA_API_KEY='replace-with-your-issued-key'
+
+curl --fail-with-body --max-time 150 \
+  "$RAYA_BASE_URL/v1/systemone" \
+  -H "Authorization: Bearer $RAYA_API_KEY" \
+  -H 'Content-Type: application/json' \
+  --data-binary '{
+    "model": "raya-decision-v1",
+    "state": "I forgot my password and cannot sign in.",
+    "questions": {
+      "intent": {
+        "type": "choice",
+        "instructions": "What is the main request?",
+        "criteria": {
+          "reset_password": "Recover or reset a login password",
+          "register": "Create a new account",
+          "other": "A different request"
+        }
+      }
+    }
+  }'
+```
+
+示意响应，概率和token数仅用于展示结构：<br>
+Illustrative response; probabilities and token counts below are examples, not a measured guarantee:
 
 ```json
 {
@@ -78,127 +127,140 @@ uv run raya-serve
     "intent": {
       "type": "choice",
       "choice": "reset_password",
-      "probabilities": {"reset_password": 0.98, "register": 0.01, "close_account": 0.01},
+      "probabilities": {"reset_password": 0.98, "register": 0.01, "other": 0.01},
       "confidence": 0.98
     }
   },
-  "usage": {"input_tokens": 100, "output_tokens": 0}
+  "usage": {"input_tokens": 96, "output_tokens": 0}
 }
 ```
 
-返回的是调用方定义的 `reset_password`，内部 A/B/C 标签不暴露为协议答案。缺少 `state`、`questions`、`instructions` 或 choice/score 的 `criteria` 会返回 422；只有媒体、没有问题的请求不会被执行。
+返回调用方定义的选项ID，无需解析生成文本。`confidence`当前定义为最大候选概率；候选集合不完整时，高置信度也不保证判断正确。
 
-三种问题：
+The response uses your option IDs, so no generated prose needs to be parsed. `confidence` is currently the maximum candidate probability; a high value does not guarantee correctness when the candidate set is incomplete.
 
-| type | 调用方必须给什么 | 返回 |
-| --- | --- | --- |
-| `choice` | `instructions` + `criteria` 对象（选项 ID → 描述） | `choice`、所有选项的 `probabilities`、`confidence` |
-| `score` | `instructions` + 从低到高的 `criteria` 数组 | `score`（Σ索引×概率）、`legend`、`probabilities`、`confidence` |
-| `noul` | `instructions`；可选 `criteria.true` / `criteria.false` | `noul`，表示“是”的概率；候选在内部固定为是/否 |
+完整的鉴权、图片/视频上传、三种问题类型、限制、错误码和重试说明见 **[API接入文档](docs/api.md)**。
 
-同一请求可混合多个问题，响应 `answers` 使用原问题 ID，问题互相独立。`state` 支持文字、JSON 对象/数组；`instructions` 和描述也支持结构化 JSON。详见 **[完整接口规范](docs/api.md)** 与 [机器可读 OpenAPI](docs/openapi.json)。
+See the **[API integration guide](docs/api.md)** for authentication, media inputs, all three question types, limits, errors, and retry behavior. A machine-readable [OpenAPI schema](docs/openapi.json) is included.
 
-### 文字 + 图片 / 视频
+### 独立 Python 客户端 / Standalone Python client
 
-顶层字段仍与 Jev 一致；Raya 在 `state` 内扩展 `text` 和 `media`：
+仅依赖Python标准库，调用方不需要安装模型或推理依赖。
 
-```python
-import base64
-import os
-from pathlib import Path
-import httpx
-
-image_url = "data:image/jpeg;base64," + base64.b64encode(
-    Path("local_tests/image.jpg").read_bytes()
-).decode()
-request = {
-    "model": "raya-decision-v1",
-    "state": {
-        "text": "观察图片中右侧人物。",
-        "media": [{"type": "image", "url": image_url}],
-    },
-    "questions": {
-        "held_object": {
-            "type": "choice",
-            "instructions": "右侧人物手里拿着什么？",
-            "criteria": {"basketball": "篮球", "laptop": "笔记本电脑", "cup": "水杯"},
-        },
-    },
-}
-response = httpx.post(
-    "http://127.0.0.1:8000/v1/systemone",
-    headers={"Authorization": "Bearer " + os.environ["RAYA_API_KEY"]},
-    json=request, timeout=120,
-)
-response.raise_for_status()
-print(response.json()["answers"]["held_object"])
-```
-
-视频用 `type: "video"` 和 `data:video/mp4;base64,...`；同样必须有明确问题和候选/等级。只分析画面，不识别音轨。Jev 官方当前仅支持文本，所以这个多模态 state 是 Raya 扩展，不能原样发到 Jev。
-
-## 限制与语义差异
-
-| 项目 | Raya 当前约束 |
-| --- | --- |
-| choice | 2–26 个选项；Jev 文档允许最多 255，Raya v1 标签空间暂不支持 |
-| score | 2–10 个等级，分数索引从 0 开始 |
-| questions | 每请求 1–16 个 |
-| token | 每个问题的完整输入 ≤4096（含 state、问题、候选和视觉展开） |
-| 文本 | 完整内部文本 ≤65536 字符；候选渲染后 ≤2048 字符 |
-| 媒体 | 默认最多 4 个，最多 1 个视频；每个 ≤64MiB |
-| 图片/视频帧 | 原始像素 ≤2000 万；预处理图片预算 262144 像素、视频每帧 131072 |
-| 视频 | **3–20 秒（含边界）**，服务端检查时长，按 Qwen `fps=1` 采样 |
-| HTTP 请求体 | ≤96MiB（包括 base64 开销） |
-
-视频时长范围是接口约束，环境变量只能在 3–20 秒内收紧；超限返回 422 / `video_duration_out_of_range`，不会自动截短。
-
-其他工程预算可按 [配置](raya_maas/config.py) 中的 `RAYA_*` 调整，受字段验证上限约束。超限明确报错，不静默截断文字或视频时长。
-
-Raya 的 `confidence=max(probabilities)`。Jev 官方只说明 confidence 从分布计算，未在所查文档公开精确公式，所以**协议结构对齐不等于置信度数值或校准行为相同**。`noul` / `score` 由 Raya 候选分布映射，未另外宣称经过 Jev 的专项校准。门控阈值由调用方设置。
-
-多问题目前逐个前向，媒体仅下载/解码一次；没有 Jev 的共享 state 并行前向优化。`usage.input_tokens` 是各次实际前向输入 token 之和，重复 state 会重复计数；没有生成步骤，因此 `output_tokens=0`。不把这些模型能力差异伪装成全量 Jev 实现。
-
-## 视频性能与运行
-
-PyAV/FFmpeg 按 Qwen `fps=1` 计算采样数量并均匀取帧，先读取关键帧索引估算解码工作量，自动选择 seek 或一次顺序解码，避免短视频长 GOP 被反复解码。仅对选中帧缩放和 RGB 转换；seek 失败时回退到有预算的顺序解码。保留时间元数据，processor 不再次采样，并限制每帧像素。只保留末位 logits，不用 KV cache。
-
-当前默认使用 8 线程 CPU 解码；在本机的 10 秒样例上，1 线程约 637ms、8 线程约 129ms，
-VideoToolbox 约 481ms，选中帧逐像素一致，所以不默认启用硬件解码。可用
-`RAYA_VIDEO_DECODE_THREADS` 调整线程数；`RAYA_VIDEO_DECODER=videotoolbox/cuda/auto` 用于
-显式硬件解码实验，auto 在硬件不可用时回退软件。CUDA 解码尚未实机验证。
-
-采样与原生 Qwen `fps=1, num_frames=None` 规则一致：按源帧数/帧率计算数量，至少 4 帧
-（若源视频足够），再均匀选点；不是严格在整数秒取帧。3 秒通常取 4 帧，10 秒取 10 帧，20 秒取
-20 帧。奇数帧由 processor 重复末帧补成偶数，保留原始时间戳，不再次采样。
-每帧分辨率预算保持不变，总像素预算按采样帧数增长。实时数据与 8 帧对比见
-[1fps 验收报告](docs/fps1-validation.md)。
-
-单进程、单模型 worker；默认等待队列 8，满时返回 429。请求超时默认 120 秒返回 504；超时不会提前释放仍在执行的 worker，也不会触发重叠前向。禁止为同一 GPU 盲目增加 Uvicorn worker，扩容使用独立实例。
-
-API 默认 Bearer 鉴权，`RAYA_API_KEYS` 以逗号分隔支持轮换。`/healthz` 和 `/readyz` 不鉴权；`GET /v1/models` 返回 Raya 能力信息。API 提供 `x-request-id`。仅本地临时测试可显式打开 `RAYA_ALLOW_ANONYMOUS=true`。
-
-媒体默认仅接受 data URL；HTTPS 必须在 `RAYA_MEDIA_HOSTS` 可信域名名单中，禁止重定向、代理环境和私有/保留 IP。部署层仍需限制出站网络。日志不记录正文、媒体或密钥。公网在网关配置 TLS、调用方配额和限流。
-
-## 容器与验证
+The example client uses only the Python standard library. Callers do not need model weights or inference dependencies.
 
 ```bash
-# 模型预下载，.env 配置完毕后
-# CPU Linux；Docker Desktop 无法使用 macOS MPS
- docker compose up -d --build
-# NVIDIA Linux，宿主机需要驱动和 NVIDIA Container Toolkit
- docker compose -f compose.yaml -f compose.cuda.yaml up -d --build
-
-uv run ruff check raya_maas scripts local_tests tests
-uv run pytest -q
-# 对已经启动的原生服务进行真实多模态 HTTP 检查（从 .env 读取密钥）
-uv run python scripts/smoke.py
-# 检查真实模型的视频/图片分支，并对当前 10 秒样例测 3 次 RT
-uv run python scripts/audit_video.py
-# 视频解码对比
-uv run python scripts/benchmark_video.py \
-  local_tests/video.mp4 tests/fixtures/m3bench_living.mp4 --runs 3
+python3 docs/examples/call_raya.py --request docs/examples/text-request.json
+python3 docs/examples/call_raya.py --request docs/examples/image-request.json --image ./photo.jpg
+python3 docs/examples/call_raya.py --request docs/examples/video-request.json --video ./clip.mp4
 ```
 
-容器非 root，模型只读挂载。CUDA 实机和容器构建尚未验证；MPS/CPU 与解码测试见 [验收记录](docs/validation.md)。已有 bench 的来源记录在 `local_tests/provenance.json` 和 `tests/fixtures/provenance.json`，不据此假设未参与模型训练。
+图片与视频脚本会自动生成Base64 data URL。HTTP接口不接受本地路径；HTTPS媒体域名需要由维护者加入白名单。
 
-协议依据：[Jev 官方 API](https://docs.typesafe.ai/api)、[State](https://docs.typesafe.ai/concepts/state)、[Confidence](https://docs.typesafe.ai/confidence)。模型推理格式以提供的 Raya v1 手册为准。
+For media requests, the client converts local files to Base64 data URLs. The HTTP API does not accept local file paths; remote HTTPS media hosts must be allowlisted by the operator.
+
+## 默认限制 / Default limits
+
+| 项目 / Item | 限制 / Limit |
+| --- | --- |
+| 输入token / Input tokens | 每问题4096，包含材料、候选和视觉token / 4,096 per question, including context, options, and visual tokens |
+| 问题 / Questions | 每请求1–16 / 1–16 per request |
+| 图片和视频 / Media | 每请求最多4个，最多1个视频 / Up to 4 items, at most 1 video |
+| 文件 / File size | 每个最多64MiB / Up to 64MiB per item |
+| HTTP请求体 / HTTP body | 最多96MiB，含Base64开销 / Up to 96MiB, including Base64 overhead |
+| 视频 / Video | 3–20秒，含边界 / 3–20 seconds, inclusive |
+| 源像素 / Source pixels | 图片或视频帧最多2000万 / Up to 20 million pixels per image or video frame |
+| 排队 / Queue | 最多8个等待请求 / Up to 8 waiting requests |
+| 超时 / Timeout | 默认120秒 / 120 seconds by default |
+
+视频采样遵循Qwen `fps=1`规则：通常至少4帧，10秒约10帧，20秒约20帧；奇数帧在编码时复制末帧补齐。它不保证每个整数秒恰好取一帧，也不处理音轨。
+
+Video sampling follows Qwen's `fps=1` policy: normally at least 4 frames, around 10 for 10 seconds and 20 for 20 seconds. An odd frame count is padded by repeating the last frame during encoding. Sampling is not strictly aligned to integer-second timestamps, and audio is not processed.
+
+超限会明确报错，不静默截断。当前多问题逐个前向，媒体解码可复用，但没有共享前缀并行推理或动态批处理。每个请求的处理、前向和排队耗时通过`X-Raya-*-Ms`响应头提供。
+
+Limit violations return explicit errors rather than silent truncation. Questions currently run sequentially; decoded media is reused, but shared-prefix parallel inference and dynamic batching are not implemented. Per-request processing, forward-pass, and queue times are exposed through `X-Raya-*-Ms` response headers.
+
+## 运行与部署 / Runtime and deployment
+
+- 自动设备模式使用 CUDA → MPS → CPU；显式指定设备时不自动切换。<br>
+  Automatic mode selects CUDA → MPS → CPU; explicitly selecting a device disables device fallback.
+- 自动精度为 CUDA BF16（不支持时FP16）、MPS FP16、CPU FP32。<br>
+  Automatic precision uses CUDA BF16 when supported, otherwise FP16; MPS FP16; CPU FP32.
+- 单worker持有一份模型。请求超时后，已开始的前向可能继续运行；重试可能重复计算。<br>
+  A single worker owns the model. An in-flight forward pass may continue after a request times out; retries may repeat computation.
+- 每帧像素预算保持可控；视频默认使用8线程CPU解码，根据关键帧分布选择seek或顺序读取。<br>
+  Per-frame pixel budgets are bounded. Video decoding defaults to 8 CPU threads and selects seeking or sequential decoding based on keyframes.
+- 服务端凭据放在`.env`，对外部署的TLS和调用方配额由网关负责。<br>
+  Server credentials belong in `.env`; use a gateway for public TLS termination and per-client quotas.
+
+```bash
+# CPU container / CPU容器
+docker compose up -d --build
+
+# NVIDIA host with drivers and NVIDIA Container Toolkit
+# NVIDIA宿主机需安装驱动和Container Toolkit
+docker compose -f compose.yaml -f compose.cuda.yaml up -d --build
+```
+
+容器使用非root用户和只读模型挂载。macOS的MPS应使用原生Python运行；Docker Desktop内的Linux容器不能使用MPS。Docker构建和CUDA实机性能尚未在本项目当前开发环境验证。
+
+Containers use a non-root user and a read-only model mount. Use native Python for macOS MPS; Linux containers in Docker Desktop cannot use MPS. Docker builds and CUDA hardware performance have not been verified in the current development environment.
+
+## 本地验证 / Local verification
+
+```bash
+uv run ruff check raya_maas scripts local_tests tests docs/examples
+uv run pytest -q
+
+# 已启动服务的真实HTTP检查 / Real HTTP checks against a running service
+uv run python scripts/smoke.py
+```
+
+不启动HTTP服务时，也可以运行`local_tests/run_text.py`、`run_image.py`或`run_video.py`，在PyCharm中直接Run/Debug。编辑同目录JSON定义材料、问题和候选。媒体文件不随仓库分发，请提供自己的图片/视频并更新相对路径；默认文字示例无需媒体。
+
+For offline testing, run `local_tests/run_text.py`, `run_image.py`, or `run_video.py`, including through PyCharm Run/Debug. Edit the adjacent JSON files to define context, questions, and options. Media files are not distributed with the repository: provide your own files and update the relative paths. The default text example requires no media.
+
+现有验证覆盖协议、鉴权、输入限制、采样一致性、设备降级、请求队列和计时。小样本结果不代表整体准确率或生产SLA；MPS上的20秒视频当前仍可能超过2秒。具体数据与边界见下列报告。
+
+Verification covers the protocol, authentication, input limits, sampling consistency, device fallback, request scheduling, and timing. Small-sample results are not overall accuracy claims or production SLAs; 20-second videos on MPS can still take more than 2 seconds. See the reports for measured results and limitations.
+
+- [综合验收 / Verification record](docs/validation.md)
+- [1fps对比与性能 / 1fps evaluation and latency](docs/fps1-validation.md)
+- [视频链路审查 / Video pipeline audit](docs/video-audit.md)
+
+## 项目结构 / Repository layout
+
+```text
+raya_maas/       # 推理与HTTP服务 / Inference and HTTP service
+local_tests/     # 可编辑JSON与独立入口 / Editable JSON requests and local runners
+scripts/         # 媒体准备、检查与基准 / Media preparation, checks, benchmarks
+tests/           # 自动化测试 / Automated tests
+docs/            # 接入规范与验证记录 / Integration guide and verification records
+docs/examples/   # 独立客户端与请求模板 / Standalone client and request templates
+models/          # 本地下载，不进Git / Downloaded locally, excluded from Git
+artifacts/       # 本地产物，不进Git / Local outputs, excluded from Git
+```
+
+## 贡献 / Contributing
+
+欢迎通过 [Issues](https://github.com/Aries-ld/raya/issues) 报告可复现的问题，或提交范围明确的Pull Request。请说明设备、依赖版本、输入模态、预期和实际行为；共享请求样例前移除密钥与私人媒体。
+
+Use [Issues](https://github.com/Aries-ld/raya/issues) for reproducible bug reports, or submit a focused pull request. Include the device, dependency versions, input modality, expected behavior, and actual result. Remove credentials and private media from shared examples.
+
+修改前后请运行相关测试与格式检查。协议变更需同步更新API文档、请求示例和OpenAPI定义。
+
+Run the relevant tests and formatting checks before submitting changes. Keep the API guide, request examples, and OpenAPI definition in sync with protocol changes.
+
+## 许可证 / License
+
+本仓库代码采用 [Apache License 2.0](LICENSE)。模型权重、基座和外部媒体不在此代码许可证的授权范围内，其使用条款以各自发布方说明为准。
+
+The source code is licensed under the [Apache License 2.0](LICENSE). This code license does not grant rights to model weights, the base model, or external media; those artifacts are governed by their respective publishers' terms.
+
+## 相关项目 / References
+
+- [Raya model on Hugging Face](https://huggingface.co/yuyu199741/raya-decision-v1)
+- [Qwen3.5-2B](https://huggingface.co/Qwen/Qwen3.5-2B)
+- [TypeSafe System One API](https://docs.typesafe.ai/api)
+- [Hugging Face Transformers](https://github.com/huggingface/transformers)

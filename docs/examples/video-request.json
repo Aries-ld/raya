@@ -1,0 +1,21 @@
+{
+  "model": "raya-decision-v1",
+  "state": {
+    "text": "根据视频画面判断场景，不使用音轨。",
+    "media": [
+      {"type": "video", "url": "data:video/mp4;base64,REPLACE_WITH_BASE64"}
+    ]
+  },
+  "questions": {
+    "scene": {
+      "type": "choice",
+      "instructions": "这段视频中的主要场景是什么？",
+      "criteria": {
+        "indoor": "主要是室内场景",
+        "outdoor": "主要是室外场景",
+        "mixed": "同时包含明显的室内和室外场景",
+        "uncertain": "画面信息不足，无法判断"
+      }
+    }
+  }
+}

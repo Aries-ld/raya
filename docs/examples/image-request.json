@@ -1,0 +1,20 @@
+{
+  "model": "raya-decision-v1",
+  "state": {
+    "text": "观察图片中的主要场景。",
+    "media": [
+      {"type": "image", "url": "data:image/jpeg;base64,REPLACE_WITH_BASE64"}
+    ]
+  },
+  "questions": {
+    "scene": {
+      "type": "choice",
+      "instructions": "图片中的主要场景是室内还是室外？",
+      "criteria": {
+        "indoor": "室内场景",
+        "outdoor": "室外场景",
+        "uncertain": "画面信息不足，无法判断"
+      }
+    }
+  }
+}

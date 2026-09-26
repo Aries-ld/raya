@@ -6,6 +6,9 @@ build-backend = "hatchling.build"
 name = "raya-maas"
 version = "0.1.0"
 description = "Multimodal decision MaaS with a Jev-shaped System One protocol"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "fastapi>=0.135,<0.142", "uvicorn[standard]>=0.41,<0.55",
@@ -16,6 +19,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.15,<0.17"]
+
+[project.urls]
+Repository = "https://github.com/Aries-ld/raya"
+Documentation = "https://github.com/Aries-ld/raya/blob/main/docs/api.md"
+Model = "https://huggingface.co/yuyu199741/raya-decision-v1"
 
 [project.scripts]
 raya-serve = "raya_maas.cli:serve"
