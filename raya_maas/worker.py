@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import logging
 import time
 
@@ -21,7 +22,7 @@ class InferenceWorker:
     async def start(self):
         self.task = asyncio.create_task(self._run())
 
-    async def submit(self, request):
+    async def submit(self, request, *, with_metrics=False):
         if self.closed:
             raise APIError("Service shutting down", 503, "service_unavailable")
         future = asyncio.get_running_loop().create_future()
@@ -30,7 +31,8 @@ class InferenceWorker:
         except asyncio.QueueFull as exc:
             raise APIError("Inference queue full; retry later", 429, "rate_limit_exceeded") from exc
         try:
-            return await asyncio.wait_for(asyncio.shield(future), self.timeout)
+            result, metrics = await asyncio.wait_for(asyncio.shield(future), self.timeout)
+            return (result, metrics) if with_metrics else result
         except TimeoutError as exc:
             future.cancel()
             raise APIError("Inference deadline exceeded", 504, "request_timeout") from exc
@@ -53,9 +55,11 @@ class InferenceWorker:
                     continue
                 self.active = True
                 try:
-                    result = await asyncio.to_thread(self.engine.predict, request)
+                    queue_ms = max(0, (time.monotonic() - (deadline - self.timeout)) * 1000)
+                    result, metrics = await asyncio.to_thread(self._predict, request)
+                    metrics["queue_ms"] = round(queue_ms, 3)
                     if not future.done():
-                        future.set_result(result)
+                        future.set_result((result, metrics))
                 except Exception as exc:
                     if not isinstance(exc, APIError):
                         # No request body, media URLs or credentials in logs/errors.
@@ -67,6 +71,19 @@ class InferenceWorker:
                     self.active = False
             finally:
                 self.queue.task_done()
+
+    def _predict(self, request):
+        started = time.perf_counter()
+        result = self.engine.predict(request)
+        # Snapshot in the model-owning thread; the next job must not overwrite these timings.
+        diagnostics = copy.deepcopy(getattr(self.engine, "last_diagnostics", {}))
+        metrics = {"processing_ms": round((time.perf_counter() - started) * 1000, 3)}
+        questions = diagnostics.get("questions", {})
+        if questions and all("forward" in q.get("timing_ms", {}) for q in questions.values()):
+            metrics["forward_ms"] = round(
+                sum(q["timing_ms"]["forward"] for q in questions.values()), 3
+            )
+        return result, metrics
 
     async def close(self):
         self.closed = True

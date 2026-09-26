@@ -12,6 +12,7 @@ from raya_maas.local_test import load_request_file, run_local_decision  # noqa: 
 def main():
     request = load_request_file(DIRECTORY / "image.json")  # 完整决策请求，可在此查看/修改。
     result = run_local_decision(request, DIRECTORY.parent)
+    print(result)
     return result  # 响应只有 model / answers / usage，与 HTTP 接口相同。
 
 

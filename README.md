@@ -4,6 +4,18 @@ Raya v1 是基于 Qwen3.5-2B 的多模态候选决策模型。服务采用 **Jev
 
 正式接口：`POST /v1/systemone`。请求顶层为 `model / state / questions`，响应顶层为 `model / answers / usage`。本工程不再提供聊天接口或聊天 SDK 兼容层。训练代码、数据集已移除，只保留下载、推理、服务和自测。
 
+## 摄像头手势示例
+
+运行 MaaS 后，在另一个终端执行 `uv run raya-demo`，打开 **http://127.0.0.1:8765**。
+也可在 PyCharm 右键 `local_tests/run_gesture_demo.py`，或选择 `Raya Camera Demo` 配置。
+点“开启摄像头”只预览，点“开始识别”后每秒采一张图片做决策。
+拳头、1/2/3/4/5根手指分别控制六种粒子效果；右侧逐次展示实际采样图、候选概率、原始
+响应 JSON、模型前向耗时、服务端处理耗时和浏览器往返 RT。
+
+模型常驻 MaaS，演示页不会每次加载权重。上一帧未完成时跳过本次采样，不排队旧图。
+浏览器通过绑定 loopback 的演示代理调用 MaaS，API key 保留在服务端。详见
+[Gesture Lab 使用与测试说明](docs/gesture-demo.md)。
+
 ## 先直接测试，不启动服务
 
 PyCharm 解释器选本项目 `.venv/bin/python`。在 `local_tests/` 中编辑 JSON，再对相应脚本右键 Run / Debug。无需启动参数或 API key。

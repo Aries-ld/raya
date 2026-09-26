@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="用摄像头手势控制粒子：Raya 每秒一次图片决策，展示真实响应与推理耗时。"
+    />
+    <title>Raya · Gesture Lab</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <a class="skip" href="#controls">跳到控制区</a>
+    <main class="shell">
+      <header class="header">
+        <a class="brand" href="/" aria-label="Raya Gesture Lab 首页"
+          ><span class="brand-mark">r</span
+          ><span>RAYA <b>/</b> <em>Gesture Lab</em></span></a
+        >
+        <div id="connection" class="connection">
+          <i></i><span>正在连接本机模型</span>
+        </div>
+      </header>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">ONE FRAME. ONE DECISION.</p>
+          <h1>让你的手势，<span>改变粒子的形状。</span></h1>
+        </div>
+        <p class="intro-note">
+          一只手，六种形态。<br />摄像头每秒采样一次，由 Raya 决定下一幕。
+        </p>
+      </section>
+      <div class="layout">
+        <section class="playground" aria-label="手势交互实验">
+          <figure class="world" id="world" data-mode="none">
+            <canvas
+              id="particles"
+              aria-label="由手势决策控制的粒子动画"
+            ></canvas>
+            <div class="world-top">
+              <span class="live-tag"
+                ><i id="live-dot"></i
+                ><span id="live-label">READY WHEN YOU ARE</span></span
+              ><span class="world-spec">1,200 PARTICLES / LIVE CANVAS</span>
+            </div>
+            <div class="effect-name">
+              <span id="effect-index">—</span>
+              <div>
+                <small>当前画面</small
+                ><strong id="effect-title">待机星尘</strong>
+                <p id="effect-subtitle">先开启摄像头，再开始识别</p>
+              </div>
+            </div>
+            <div class="camera-dock">
+              <div class="camera-frame" id="camera-frame">
+                <video
+                  id="camera"
+                  autoplay
+                  muted
+                  playsinline
+                  aria-label="摄像头镜像预览"
+                ></video>
+                <div class="camera-empty" id="camera-empty">
+                  <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <rect x="5" y="9" width="22" height="17" rx="4" />
+                    <path d="m11 9 2-4h6l2 4" />
+                    <circle cx="16" cy="17" r="5" /></svg
+                  ><span>摄像头尚未开启</span>
+                </div>
+                <span class="crop-guide" aria-hidden="true"></span>
+              </div>
+              <span class="camera-caption"
+                ><i></i> CAMERA · 中央方框为识别区域</span
+              >
+            </div>
+            <figcaption class="world-bottom">
+              图片决策 · 1 Hz <span>动画独立运行，推理期间不会暂停</span>
+            </figcaption>
+          </figure>
+          <div
+            class="gesture-legend"
+            id="gesture-legend"
+            aria-label="六种手势与对应效果"
+          ></div>
+          <section
+            id="controls"
+            class="controls-panel"
+            aria-label="摄像头与识别控制"
+          >
+            <div class="controls">
+              <button id="camera-on" class="button primary">
+                开启摄像头 <span>↗</span></button
+              ><button id="recognize" class="button" disabled>开始识别</button
+              ><button id="camera-off" class="text-button" disabled>
+                关闭摄像头
+              </button>
+            </div>
+            <p id="status" class="status" role="status">
+              先开启摄像头预览；点击“开始识别”后才发送画面。
+            </p>
+            <p class="guidance">
+              将一只手完整放进方框，背景尽量简单。拇指伸直也计为一根手指。
+            </p>
+          </section>
+          <div class="metrics" aria-label="本次运行统计">
+            <div>
+              <span>最近往返 RT</span
+              ><strong id="last-rt">—<small>ms</small></strong>
+            </div>
+            <div>
+              <span>模型前向</span
+              ><strong id="last-forward">—<small>ms</small></strong>
+            </div>
+            <div>
+              <span>已完成决策</span><strong id="sample-count">0</strong>
+            </div>
+            <div>
+              <span>忙时跳过采样</span><strong id="skip-count">0</strong>
+            </div>
+          </div>
+          <p class="privacy">
+            仅请求摄像头，不使用麦克风。预览为镜像，模型收到未镜像的中央裁剪。图片仅发往配置的
+            Raya 服务，不写入磁盘；关闭摄像头会清空页面历史。
+          </p>
+        </section>
+        <aside class="results" aria-label="每次模型响应与推理耗时">
+          <div class="results-heading">
+            <div>
+              <p class="eyebrow">DECISION STREAM</p>
+              <h2>看见每一次判断 <span id="feed-count">00</span></h2>
+            </div>
+            <button
+              id="export"
+              class="icon-button"
+              disabled
+              title="导出响应和耗时，不包含图片"
+              aria-label="导出响应和耗时"
+            >
+              ↓
+            </button>
+          </div>
+          <div class="stream-meta">
+            <span><i></i> <span id="model-name">raya-decision-v1</span></span
+            ><span>最新在上 · 保留12条</span>
+          </div>
+          <div id="feed" class="feed">
+            <div class="empty-feed" id="empty-feed">
+              <div class="empty-symbol">{<span>…</span>}</div>
+              <h3>等待第一个决策</h3>
+              <p>
+                这里将展示真实采样图、候选概率、<br />响应 JSON 和本次推理时间。
+              </p>
+              <div class="empty-flow">
+                <span>摄像头图片</span><b>↓</b><span>Raya 决策</span><b>↓</b
+                ><span>粒子效果</span>
+              </div>
+            </div>
+          </div>
+          <p class="results-note">
+            候选概率不是识别准确率。置信度低于55%或响应超过2.5秒时，显示结果但不切换为目标效果。
+          </p>
+        </aside>
+      </div>
+      <footer>
+        <span>RAYA V1 <b>·</b> LOCAL VISION EXPERIMENT</span
+        ><a
+          href="https://github.com/hr98w/jev-visual/tree/main/demo/gestures"
+          target="_blank"
+          rel="noopener noreferrer"
+          >交互灵感：jev-visual ↗</a
+        >
+      </footer>
+    </main>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

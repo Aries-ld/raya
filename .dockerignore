@@ -8,3 +8,5 @@ local_tests
 artifacts
 .idea
 __pycache__
+node_modules
+demo_tests

@@ -51,3 +51,20 @@ async def test_worker_recovers_after_bad_input():
         await worker.submit("bad")
     assert (await worker.submit("good"))["label"] == "A"
     await worker.close()
+
+
+async def test_request_timings_are_snapshotted_before_next_job():
+    class Engine:
+        def predict(self, value):
+            self.last_diagnostics = {"questions": {"gesture": {"timing_ms": {"forward": value}}}}
+            return {"value": value}
+
+    worker = InferenceWorker(Engine(), 2, 1)
+    await worker.start()
+    first, second = await asyncio.gather(
+        worker.submit(12, with_metrics=True), worker.submit(34, with_metrics=True)
+    )
+    assert first[0]["value"] == 12 and first[1]["forward_ms"] == 12
+    assert second[0]["value"] == 34 and second[1]["forward_ms"] == 34
+    assert first[1]["processing_ms"] >= 0 and first[1]["queue_ms"] >= 0
+    await worker.close()

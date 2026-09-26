@@ -151,3 +151,9 @@ Jev 官方还使用 529；Raya 此版本未提供相同的过载服务实现。�
 采样 fps=1 与原视频帧率分开保存，时间戳按源帧率和采样位置计算。
 工程先完成采样，再用 `do_sample_frames=False` 交给视频 processor，避免再次抽帧。
 像素预算按实际帧数增长；token 超过上限仍返回 422，不静默截断。
+
+## 可选计时响应头
+
+`/v1/systemone` 成功响应额外携带 `X-Raya-Processing-Ms`（不含排队的服务端处理时间）、
+`X-Raya-Forward-Ms`（各问题模型前向阶段合计）、`X-Raya-Queue-Ms`（队列等待时间）。
+单位毫秒。字段从当前请求单独快照；这些是HTTP响应头，成功JSON仍只有model/answers/usage。

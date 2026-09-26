@@ -3,7 +3,7 @@ import hmac
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
@@ -148,11 +148,14 @@ def create_app(settings: Settings | None = None, engine=None) -> FastAPI:
             status: {"model": ErrorResponse} for status in (401, 404, 413, 422, 429, 500, 503, 504)
         },
     )
-    async def systemone(body: SystemOneRequest):
+    async def systemone(body: SystemOneRequest, response: Response):
         if body.model != settings.model_name:
             raise APIError("Model not found", 404, "model_not_found")
         if not app.state.ready:
             raise APIError("Model not ready", 503, "service_unavailable")
-        return await app.state.worker.submit(body)
+        result, metrics = await app.state.worker.submit(body, with_metrics=True)
+        for name, value in metrics.items():
+            response.headers[f"X-Raya-{name.replace('_', '-')}"] = str(value)
+        return result
 
     return app
