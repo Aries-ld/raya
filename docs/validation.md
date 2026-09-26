@@ -8,7 +8,7 @@
 
 正式接口为 `POST /v1/systemone`，请求顶层仅 `model / state / questions`，成功响应仅 `model / answers / usage`。图片、视频在 `state.media` 中显式提供，问题在 `questions.*.instructions`，选择项在 `criteria`。
 
-41 项自动测试通过。覆盖：
+44 项自动测试通过。覆盖：
 
 - choice 原选项 ID 映射、score 概率加权计算、noul 是的概率，以及混合问题响应。
 - 缺少 state/questions/instructions/criteria、非法问题类型、候选/等级/问题数量越界的 422。
@@ -17,6 +17,7 @@
 - 鉴权、请求体限制、未知路由/模型、队满、超时后 worker 仍独占模型、丢弃失效排队任务。
 - 媒体来源/大小/时长/像素限制、稀疏和顺序解码采样帧逐像素一致。
 - OpenAPI 请求/响应字段和路由；旧聊天端点不存在。
+- 本地常驻会话只加载一次，重新读取修改后的 JSON/媒体，输入错误可修复后重试，关闭/加载失败释放资源。
 
 测试使用模型桩验证协议/调度；真实模型结果另外记录。Starlette TestClient 对 httpx 存在一条上游弃用提示，不影响当前测试通过。
 
@@ -44,6 +45,14 @@ choice 结果与人工预期相符；概率和约为 1。noul/score 用来验证
 携带实际 Bearer key 调用 `/v1/systemone`。文本三种问题和图片/视频 choice 均通过，响应结构
 与本地一致。缺少 questions 返回 422，旧聊天路径返回 404。原始输出在
 `artifacts/systemone-http.json`。`/readyz` 探针正常，服务仍监听 `0.0.0.0:8000`。
+
+## 本地常驻会话
+
+真实运行 `local_tests/run_session.py`，在同一进程依次执行图片、回车重复图片、切换文字、
+切换 30 秒视频，再输入 q 正常退出。模型初始化仅一次，约 4855ms；重复图片这次约 584ms，
+第 4 次视频约 2315ms，后续诊断均为 `model_reused=true`、`model_load_ms=0`。
+分别保存为 `artifacts/session-repeat-image.json` 和 `artifacts/session-video.json`。
+这两个耗时仅描述本次运行，不是稳态性能承诺；视频解码和每次前向仍会执行。
 
 ## 视频解码对比
 
