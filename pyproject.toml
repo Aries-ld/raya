@@ -20,7 +20,6 @@ dev = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.15,<0.17"]
 [project.scripts]
 raya-serve = "raya_maas.cli:serve"
 raya-download = "raya_maas.download:main"
-raya-demo = "raya_maas.demo_server:serve"
 
 [tool.hatch.build.targets.wheel]
 packages = ["raya_maas"]
