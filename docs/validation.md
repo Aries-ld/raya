@@ -22,7 +22,7 @@
 
 ## 真实模型本地测试
 
-通过直接运行 `local_tests/test_text.py`、`test_image.py`、`test_video.py`，不启动客户端 HTTP 请求、不传启动参数，并将工作目录设为 `/tmp`，确认与 IDE 工作目录无关。读取同目录完整 JSON 请求，加载真实模型到 MPS FP16：
+通过直接运行 `local_tests/run_text.py`、`run_image.py`、`run_video.py`，不启动客户端 HTTP 请求、不传启动参数，并将工作目录设为 `/tmp`，确认与 IDE 工作目录无关。读取同目录完整 JSON 请求，加载真实模型到 MPS FP16：
 
 | 输入 | 问题 | 输出 | 概率/置信度 |
 | --- | --- | --- | --- |

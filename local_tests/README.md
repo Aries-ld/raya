@@ -4,9 +4,9 @@
 
 | 运行入口 | 编辑请求 | 默认媒体 |
 | --- | --- | --- |
-| `test_text.py` | `text.json` | state 中的文字 |
-| `test_image.py` | `image.json` | `image.jpg` |
-| `test_video.py` | `video.json` | `video.mp4`，30 秒 m3bench 片段 |
+| `run_text.py` | `text.json` | state 中的文字 |
+| `run_image.py` | `image.json` | `image.jpg` |
+| `run_video.py` | `video.json` | `video.mp4`，30 秒 m3bench 片段 |
 
 JSON 分成三个部分：
 
@@ -19,6 +19,12 @@ JSON 分成三个部分：
 `choice` 从选项中选一个；`score` 从有序等级的概率计算分数；`noul` 内部固定是/否选项，返回“是”的概率。`text.json` 演示一份 state 同时问三种问题。
 
 PyCharm 解释器选择项目 `.venv/bin/python`，无需参数、API key 或 HTTP 服务。`request` 变量是已经校验的正式请求；`result` 只有 `model / answers / usage`，与 HTTP 输出相同。可在这两行打断点。诊断耗时在 `artifacts/local-decision-diagnostics.json`。
+
+项目已提供 `.run/` 下的普通 Python 配置：`Raya Text`、`Raya Image`、`Raya Video`。
+可在 PyCharm 顶部运行配置下拉框选择后点击 Run / Debug，也可直接右键 `run_*.py`。
+以前保存的 `pytest in test_image.py` 等配置需要在 Run → Edit Configurations 中删除或停用；
+继续点击旧配置的重跑按钮仍会启动 pytest。`collected 0 items` / `Empty suite` / 退出码 5
+表示启动了测试收集器，没有执行模型。三个入口已改名为 `run_*.py`，避免 `test_` 命名误识别。
 
 文件中的 `file:./image.jpg` / `file:./video.mp4` 是本地测试加载器的便利语法，运行时转换成 data URL；HTTP 服务不支持 file URL。可以直接替换同名媒体，也可直接修改 JSON 中的相对文件路径，路径相对于 JSON 所在目录。
 

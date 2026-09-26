@@ -10,18 +10,18 @@ PyCharm 解释器选本项目 `.venv/bin/python`。在 `local_tests/` 中编辑 
 
 | 运行脚本 | 编辑的完整请求 | 默认媒体 |
 | --- | --- | --- |
-| `local_tests/test_text.py` | `local_tests/text.json` | 文字在 `state` 中；示例含 choice/noul/score 三个问题 |
-| `local_tests/test_image.py` | `local_tests/image.json` | `local_tests/image.jpg` |
-| `local_tests/test_video.py` | `local_tests/video.json` | `local_tests/video.mp4`，m3bench 的 30 秒片段 |
+| `local_tests/run_text.py` | `local_tests/text.json` | 文字在 `state` 中；示例含 choice/noul/score 三个问题 |
+| `local_tests/run_image.py` | `local_tests/image.json` | `local_tests/image.jpg` |
+| `local_tests/run_video.py` | `local_tests/video.json` | `local_tests/video.mp4`，m3bench 的 30 秒片段 |
 
 每份 JSON 中都能直接看到 `state`、`questions.*.instructions` 和 `criteria`。替换媒体可保持文件名不变；换问题就同时调整判断标准。在 `request = load_request_file(...)` 和 `return result` 打断点可分别检查完整请求与响应。
 
 本地 JSON 用 `file:./image.jpg` / `file:./video.mp4` 引用文件，测试脚本先转为 base64 data URL，再交给与 HTTP 相同的 `SystemOneRequest` 和推理路径。**HTTP 接口禁止读取服务端本地文件**。相对路径相对于 JSON 所在目录，模型和 `.env` 相对于项目根目录，不依赖 IDE 工作目录。
 
 ```bash
-uv run python local_tests/test_text.py
-uv run python local_tests/test_image.py
-uv run python local_tests/test_video.py
+uv run python local_tests/run_text.py
+uv run python local_tests/run_image.py
+uv run python local_tests/run_video.py
 ```
 
 每次脚本运行都会重新加载模型。标准输出严格为决策响应；本地模型加载时间、设备、各问题前向与视频解码耗时写入 `artifacts/local-decision-diagnostics.json`，每次覆盖，也可在调试器查看 `engine.last_diagnostics`。
