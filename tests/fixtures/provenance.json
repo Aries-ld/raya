@@ -1,0 +1,18 @@
+[
+  {
+    "file": "m3bench_living.jpg",
+    "source": "/Users/lindong/PycharmProjects/mneme/docs/figures/m3bench-real-v2/assets/living.jpg",
+    "sha256": "2092387434d4cdfbbeeed5a2912864690bb1ce40d29058474659c9cd6f898e7a"
+  },
+  {
+    "file": "m3bench_kitchen.mp4",
+    "source": "/Users/lindong/PycharmProjects/mneme/联调/ingest6_runs/v6_kitchen15/kitchen_15/clips/clip_00.mp4",
+    "sha256": "2601aac0568b78fca1578041e762b774f8f7cb956b74929c67a87d8585ed0983"
+  },
+  {
+    "file": "m3bench_living.mp4",
+    "source": "/Users/lindong/PycharmProjects/mneme/联调/workbench_runs/living_room_22_0s_1clip_v2_20260714-194718/clips/clip000.mp4",
+    "sha256": "f28268333ddbdfb978218a63f0fa4f57bc74f769ec257bd33590ccd2af680620",
+    "transform": "First 12 seconds, stream copy, audio removed (ffmpeg -t 12 -an -c:v copy)"
+  }
+]

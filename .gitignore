@@ -1,20 +1,16 @@
-# data / artifacts (sync via download scripts, never git) — 仅仓库根，锚定防误伤 raya/data/ 包
-/data/
-/checkpoints/
-/logs/
-*.ckpt
-*.safetensors
-
-# secrets — existence-check only, never commit
+.venv/
 .env
 .env.*
-
-# python
+!.env.example
+/models/
+/artifacts/
+/tests/fixtures/*.mp4
+/tests/fixtures/*.jpg
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 .ruff_cache/
-
-# os / ide
 .DS_Store
 .idea/
+dist/
+*.egg-info/

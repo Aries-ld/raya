@@ -1,14 +1,36 @@
-[project]
-name = "raya"
-version = "0.1.0"
-description = "Multimodal System-1 fast-decision model (Jev paradigm)"
-requires-python = ">=3.12"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-# flat layout：不 pip install -e .，统一 PYTHONPATH=. 运行（同 personos 约定）
+[project]
+name = "raya-maas"
+version = "0.1.0"
+description = "Single-forward multimodal decision serving with an OpenAI-compatible API"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.135,<0.142", "uvicorn[standard]>=0.41,<0.55",
+  "pydantic-settings>=2.12,<3", "httpx>=0.28,<0.29",
+  "torch==2.10.0", "torchvision==0.25.0", "transformers==5.17.0",
+  "huggingface-hub>=1.0,<2", "pillow>=12.1,<13", "av>=16,<19",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9,<10", "pytest-asyncio>=1,<2", "ruff>=0.15,<0.17", "openai>=2,<4"]
+
+[project.scripts]
+raya-serve = "raya_maas.cli:serve"
+raya-download = "raya_maas.download:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["raya_maas"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = [
-    "integration: hits network / downloads datasets (run manually with -m integration)",
-]
-addopts = "-m 'not integration'"
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

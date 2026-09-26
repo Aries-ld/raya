@@ -1,0 +1,12 @@
+services:
+  raya:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./models:/app/models:ro
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 180s
+    # NVIDIA Linux: use docker compose -f compose.yaml -f compose.cuda.yaml up -d
